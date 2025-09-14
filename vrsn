@@ -1,0 +1,478 @@
+#!/usr/bin/perl -w
+#
+# 22.6.2006
+#  -nolog eingefuehrt, dadurch wurde es noetig, die Argumente
+#  z.B. mit grep /^-s$/ zu durchsuchen
+#
+# 3.2.2005
+#   'ls -1' ersetzt durch opendir, weil es am BW5 Probleme dadurch
+#   gab, dass /online_dir zuviele Files enthielt
+#
+use strict;
+
+use vars qw( $flag_nolog); 
+
+#
+# ~/tools/vrsn is a copy of this file
+#
+sub print_usage
+{
+
+    print <<EOF;
+
+  Usage: 
+
+    Display all versions:              # vrsn file_name 
+
+    Create a new version:              # vrsn -s file_name
+
+    Purge, keeping nk (def 2):         # vrsn -p [nk] file_name 
+
+        Rename the files, starting from 1: # vrsn -reset file_name 
+
+        -nolog is optional, suppresses informational output
+
+EOF
+        ;
+
+    return 0;
+}
+#
+#
+#
+sub display_files
+{
+    my ($fname) = @_;
+    my $file_name;
+    my $extension;
+    my $no;
+    my $status = 1;
+    my $i;
+    my $temp;
+    my $flag_exists = 0;
+
+    find_extension_and_no( $fname, \$file_name, \$extension, \$no);
+    #
+    # debug
+    #
+    #    print " display: $fname -> $file_name, $extension, $no \n";
+
+    if( -e $fname)
+    {
+        print " $fname\n";
+        $flag_exists = 1;
+    }
+
+    if( !$no && !$flag_exists)
+    {
+        $status = 0;
+        print "vrsn: $fname: no such file or version of it \n";
+        goto finish;
+    }
+
+    for( $i = $no; $i > 0; $i -= 1)
+    {
+        if( defined( $extension))
+        {
+            $temp = sprintf "%s_%05d.%s", $file_name, $i, $extension;
+        }
+        else
+        {
+            $temp = sprintf "%s_%05d", $file_name, $i;
+        }
+        if( ! -e $temp)
+        {
+            if( defined( $extension))
+            {
+                $temp = sprintf "%s_%04d.%s", $file_name, $i, $extension;
+            }
+            else
+            {
+                $temp = sprintf "%s_%04d", $file_name, $i;
+            }
+        }
+        next if( ! -e $temp);
+        print " $temp\n";
+    }
+
+  finish:
+    return $status;
+}
+#
+#
+#
+sub find_extension_and_no
+{
+    my ($fname, $file_name_p, $extension_p, $n_p) = @_;
+    my $file_name;
+    my $extension;
+    my $no = 0;
+    my $no_max = 0;
+    my $line;
+    my $status = 1;
+    my $dir; 
+    #
+    # find the extension
+    #
+    $fname =~ /(.+)\.(.*)/;
+    $file_name = $1;
+    $extension = $2;
+    if( !defined $file_name)
+    {
+        $file_name = $fname;
+    }
+    #
+    # remove the version number. needed because spectra
+    # may be pointing to some old version
+    #
+    $file_name =~ /(.+)_\d{4,5}/;
+    if( defined $1)
+    {
+        $file_name = $1;
+    }
+    
+    #
+    # find the directory name, see if the file-name
+    # contains a directory part, otherwise choose ./
+    #
+    if( $file_name =~ /(.+)\/.+/)
+    {
+        $dir = $1;
+    }
+    else
+    {
+        $dir = $ENV{PWD};
+    }
+    
+    opendir( DIR, "$dir");
+    #
+    # readdir returns file names without the directory prefix
+    #
+    while( defined( $line = readdir(DIR)))
+    {
+        if( defined( $extension))
+        {
+            next  if( "${dir}/${line}" !~ /${file_name}_(\d{4,5})\.${extension}/);
+            $no = $1;
+        }
+        else
+        {
+            next  if( "${dir}/${line}" !~ /${file_name}_(\d{4,5}).*/);
+            $no = $1;
+        }
+        #
+        # remove leading zeros
+        #
+        $no =~ s/^0*([1-9]+)/$1/;
+        $no_max = $no if( $no > $no_max);
+    }
+
+    close DIR;
+
+    $$file_name_p = $file_name;
+    $$extension_p = $extension;
+    $$n_p = $no_max;
+
+  finish:
+    return $status;
+}
+#
+#
+#
+sub purge_file
+{
+    my $extension;
+    my $status = 1;
+    my $file_name;
+    my $temp;
+    my $i;
+    my $no;
+
+    print " purge-file \n"; 
+    my $n = undef; 
+    #
+    # the no. of files to be kept is 2 or the 
+    # number that follows -p, mind there can 
+    # be the qualifier '-nolog'
+    #
+    for( my $i = 0; $i < scalar( @_); $i++)
+    {
+        if( $_[ $i] =~ /^-p$/)
+        {
+            $n = $_[$i + 1]; 
+            if( $n !~ /^\d+$/)
+            {
+                $n = 2;
+            }
+            last;
+        }
+    }
+    #
+    # the file name is the last element
+    #
+    my $fname = $_[-1]; 
+    #
+    #    if( ! -e $fname)
+    #    {
+    #	print " vrsn-purge: $fname does not exist \n";
+    #	$status = 0;
+    #	goto finish;
+    #    }
+
+    find_extension_and_no( $fname, \$file_name, \$extension, \$no);
+
+    for( $i = $no; $i > 0; $i -= 1)
+    {
+        if( defined( $extension))
+        {
+            $temp = sprintf "%s_%05d.%s", $file_name, $i, $extension;
+        }
+        else
+        {
+            $temp = sprintf "%s_%05d", $file_name, $i;
+        }
+        if( ! -e $temp)
+        {
+            if( defined( $extension))
+            {
+                $temp = sprintf "%s_%04d.%s", $file_name, $i, $extension;
+            }
+            else
+            {
+                $temp = sprintf "%s_%04d", $file_name, $i;
+            }
+        }
+        next if( ! -e $temp);
+        if( $i > ($no - $n))
+        {
+            if( !$flag_nolog)
+            {
+                print " vrsn: keeping $temp \n";
+            }
+        }
+        else
+        {
+            if( !$flag_nolog)
+            {
+                print " vrsn: deleting $temp \n";
+            }
+            unlink $temp;
+        }
+    }
+
+  finish:    
+    return $status; 
+}
+#
+#
+#
+sub save_file
+{
+    my ($fname) = @_;
+    my $extension;
+    my $status = 1;
+    my $file_name;
+    my $com;
+    my $no;
+    my $file_new; 
+
+    if( ! -e $fname)
+    {
+        print " save_file: $fname does not exist \n";
+        $status = 0;
+        goto finish;
+    }
+
+    find_extension_and_no( $fname, \$file_name, \$extension, \$no);
+
+    $no++;
+    
+    if( defined( $extension))
+    {
+        $file_new = sprintf "%s_%05d.%s", $file_name, $no, $extension;
+    }
+    else
+    {
+        $file_new = sprintf "%s_%05d", $file_name, $no;
+    }
+    #
+    # savety measure: see, if the file exists already
+    #
+    if( -e $file_new)
+    {
+        print "vrsn: $file_new exists already \n";
+        $status = 0;
+        goto finish;
+    }
+    $com = sprintf "cp -p %s %s", $fname, $file_new;
+    $status = !system( "$com");
+    
+    if( !$flag_nolog)
+    {
+        print "\nvrsn: $com\n";
+    }
+    
+  finish:
+    return $status; 
+}
+#
+#
+#
+sub reset_file
+{
+    my ($fname) = @_;
+    my $extension;
+    my $status = 1;
+    my $file_name;
+    my $no;
+    my $temp;
+    my $i;
+    my $oldname;
+    my $newname;
+
+    if( ! -e $fname)
+    {
+        print " save_file: $fname does not exist \n";
+        $status = 0;
+        goto finish;
+    }
+    find_extension_and_no( $fname, \$file_name, \$extension, \$no);
+
+    my $count = 0;
+    for( $i = $no; $i > 0; $i -= 1)
+    {
+        if( defined( $extension))
+        {
+            $temp = sprintf "%s_%05d.%s", $file_name, $i, $extension;
+        }
+        else
+        {
+            $temp = sprintf "%s_%05d", $file_name, $i;
+        }
+        if( ! -e $temp)
+        {
+            if( defined( $extension))
+            {
+                $temp = sprintf "%s_%04d.%s", $file_name, $i, $extension;
+            }
+            else
+            {
+                $temp = sprintf "%s_%04d", $file_name, $i;
+            }
+        }
+        next if( ! -e $temp);
+        $count += 1;
+    }
+    #
+    # does the version no. starts at 1 already?
+    #
+    goto finish if( ($no - $count + 1) == 1);
+
+    my $count1 = 1;
+    for( $i = ($no - $count + 1); $i < ($no + 1); $i += 1)
+    {
+        if( defined( $extension))
+        {
+            $oldname = sprintf "%s_%05d.%s", $file_name, $i, $extension;
+            if( -e $oldname)
+            {
+                $newname = sprintf "%s_%05d.%s", 
+                $file_name, $count1, $extension;
+            }
+            else
+            {
+                $oldname = sprintf "%s_%04d.%s", $file_name, $i, $extension;
+                if( -e $oldname)
+                {
+                    $newname = sprintf "%s_%04d.%s", 
+                    $file_name, $count1, $extension;
+                }
+                else
+                {
+                    print " vrsn: $oldname does exist \n";
+                    $status = 0;
+                    goto finish;
+                }
+            }
+        }
+        else
+        {
+            $oldname = sprintf "%s_%05d", $file_name, $i;
+            if( -e $oldname)
+            {
+                $newname = sprintf "%s_%05d", $file_name, $count1;
+            }
+            else
+            {
+                $oldname = sprintf "%s_%04d", $file_name, $i;
+                if( -e $oldname)
+                {
+                    $newname = sprintf "%s_%04d", 
+                    $file_name, $count1;
+                }
+                else
+                {
+                    print " vrsn: $oldname does exist \n";
+                    $status = 0;
+                    goto finish;
+                }
+            }
+        }
+        
+        if( -e $newname)
+        {
+            print " vrsn: $newname does exist \n";
+            $status = 0;
+            goto finish;
+        }
+        $count1 += 1;
+        if( !$flag_nolog)
+        {
+            print " vrsn: renaming $oldname to $newname\n";
+        }
+        rename $oldname, $newname;
+    }
+
+  finish:
+    return $status; 
+}
+#
+# --- main
+#
+my $status = 0; 
+
+if( !@ARGV)
+{
+    print_usage();
+    goto finish;
+}
+
+$flag_nolog = 0; 
+if( grep /^-nolog$/i, @ARGV)
+{
+    $flag_nolog = 1; 
+}
+
+if( grep /^-p$/, @ARGV)
+{
+    $status = purge_file( @ARGV);
+}
+elsif( grep /^-reset$/, @ARGV)
+{
+    $status = reset_file( $ARGV[-1]);
+}
+elsif( grep /^-s$/, @ARGV)
+{
+    $status = save_file( $ARGV[-1]);
+}
+else
+{
+    $status = display_files( $ARGV[-1]);
+}
+
+ finish:
+    #
+    # return 0 upon successful completion
+    #
+    exit !$status;
+
