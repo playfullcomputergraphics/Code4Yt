@@ -16,6 +16,7 @@ try:
     cythonOK = True
 except: 
     cythonOK = False
+
 try: 
     from numba import cuda
     numbaOK = True
@@ -228,6 +229,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.iterPath = None
         self.cbar = None
         self.juliaMode = None
+        self.cythonAction = None
         self.setDefaults()
         self.prepareMenuBar()
         self.prepareCentralPart()
@@ -1925,8 +1927,9 @@ class mandelBrotSetWidget( QMainWindow):
             self.numba = "True" 
             self.cython = "False"
             self.tiled = "False"
-            self.tiledCb.setChecked( self.cython == "True") 
-            self.cythonCb.setChecked( self.cython == "True") 
+            if cythonOK:
+                self.cythonAction.setChecked( self.cython == "True")
+                self.tiledAction.setChecked( self.cython == "True")
         else:
             self.numba = "False"
         self.calcMandelbrotSet()
@@ -2258,6 +2261,9 @@ class mandelBrotSetWidget( QMainWindow):
         if cythonOK: 
             self.cython = "True"
             self.tiled = "True"
+            if self.cythonAction is not None: 
+                self.cythonAction.setChecked( self.cython == "True")
+                self.tiledAction.setChecked( self.cython == "True")
         else: 
             self.cython = "False"
             self.tiled = "False"
