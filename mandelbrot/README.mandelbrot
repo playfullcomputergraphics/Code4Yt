@@ -1,1 +1,66 @@
 
+I am coming from the Linux world. Therefore I started this project
+on my Windows PCs under WSL running Debian-12. For me, this 
+environment is perfectly ok. Apart from minor issues, Debian-12/WSL 
+feels like a genuine Linux.
+
+For those who prefer Windows: Copilot tells me that everything can be
+done in Windows as well. But I am not sure whether this is the right
+approach.
+
+
+*** Files belonging to this project: 
+
+README.mandelbrot
+  this file
+
+LICENSE
+
+mandelbrot.py
+  main()
+mandelbrotPlaces.py
+  for loading .png files including the meta data
+mandelbrotTiled.py
+  multithreaded operation
+utils.py
+
+vrsn
+  Perl script creating file versions, optional
+
+  mandelbrot.py uses vrsn, if the output .png file name is
+  in conflict with an existing file. If there is a conflict
+  and vrsn does not exist, a warning will be issued and 
+  the output file will not be created.
+
+cython
+  cython.org: 
+    "Cython is an optimising static compiler for both the Python programming 
+     language and the extended Cython programming language (based on Pyrex). 
+     It makes writing C extensions for Python as easy as Python itself. "
+cython/Do.sh
+  This file has to be executed to create the shared library
+cython/mandelbrotCython.c
+cython/mandelbrotCython.pyx
+cython/setup.py
+
+Comment-1: running the time-critial part of the code in C (via cython) 
+           is a game changer. The gain in processing speed is more 
+           than a factor of 10. 
+
+Comment-2: It is possible to run mandelbrot.py without cython. 
+
+*** Dependencies
+
+python3, python3-pyqt5, python3-numpy, python3-numexpr, python3-matplotlib, cython3 (, etc)) 
+
+*** github
+
+https://github.com/playfullcomputergraphics/Code4Yt/tree/main/mandelbrot
+
+
+
+ 
+
+
+
+
