@@ -51,14 +51,15 @@ SPIRAL_VALUES = [ 0, -1, 1, 2, 3, 4]
 NORMPAR_VALUES = [ 0.25, 0.05, 0.1, 0.15, 0.2, 
                    0.25, 0.3, 0.35, 0.4, 0.45, 
                    0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 10, 15, 20, 30, 40, 50]
-COLORROTATE_VALUES = [ 1, 9, 7, 6, 5, 4, 3, 2, 1, -1, -2, -3, -4, -5, -6, -7, -9]
-ROTATEWAITTIME_VALUES = [ 0.1, 0.001, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3]
+COLORROTATE_VALUES = [ 1, 5, 4, 3, 2, 1, -1, -2, -3, -4, -5]
+NCOLORCYCLIC_VALUES = [ 128, 256]
+ROTATEWAITTIME_VALUES = [ 0.1, 0.001, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.3]
 NORM_VALUES = [ 'PowerNorm', 'LogNorm',
                 'LinNorm', 'AsinhNorm', 
                 'HistNorm', 'TwoSlopeNorm', 'StretchNorm', 
                 ]
 SCAN_POINT_VALUES = [ 200, 50, 100, 200, 300, 500, 1000]
-ZOOM_VALUES = [ 4, 1.5, 2, 3, 4, 8, 16,]
+ZOOM_VALUES = [ 4, 1., 1.2, 1.5, 2, 3, 4, 8, 16,]
 WIDTH_VALUES = [ 1000, 10, 50, 100, 256, 400, 500, 600, 700, 800, 900, 1000, 1200]
 WIDTH_BIG = WIDTH_VALUES[0]
 WIDTH_SMALL = int( WIDTH_VALUES[0]/2.)
@@ -81,7 +82,7 @@ MANDELBROT_MODE_VALUES = [ 'Tiny', 'Small', 'Medium', 'Big', 'Large', 'Huge']
 LOG_HELPER = 0.001
     
 METADATA_MEMBERS = [
-    'cxM', 'cyM', 'deltaM', 'colorMapName', 'widthM', 'widthJ', 'flagReversed', 
+    'cxM', 'cyM', 'deltaM', 'colorMapName', 'widthM', 'widthJ', 'flagReversed', 'flagCyclic',  
     'maxIterM', 'maxIterJ', 'norm', 'normPar', 'vmin', 'vmax', 'clip', 'smooth', 
     'modulo', 'power', 'rotateColorMapIndex', 'shaded', 'vert_exag', 
     'interpolation', 'blendMode', 'azDeg', 'altDeg', 'band', 'rotateWaitTime', 
@@ -97,10 +98,11 @@ MBS_Attrs = METADATA_MEMBERS + \
       'figSizeM', 'figSizeJ', 'axJ', 'dpi', 'modeOperation', 'animationFactorCombo', 
       'maxIterMCombo', 'maxIterJCombo', 'animationFactor', 
       'figM', 'figJuliaSet', 'busy', 'itOffset', 'isRotating', 
-      'dataMandelbrotSet', 'dataJuliaSet', 'stopRequested', 'figDebugSpiral', 'figDebugColoring', 
+      'dataMandelbrotSet', 'dataJuliaSet', 'stopRequested',
+      'figDebugSpiral', 'figDebugColoring', 'lastFileRead', 
       'widthCombo', 'cmapRotateSlider', 'cmapRotateSliderLbl', 'moduloCombo',
       'zoomCombo', 'maxIterMCombo', 'maxIterJCombo', 'normParCombo',  
-      'colorMap', 'modFactor', 'scanCircle', 'reversedCb',   
+      'colorMap', 'modFactor', 'scanCircle', 'reversedCb', 'cyclicCb',    
       'scanPoints', 'zoom', 'cxM', 'cyM', 'deltaM', 'cxJ', 'cyJ', 'deltaJ',
       'progress', 'imM', 'imageJuliaSet','menuBar', 'fileMenu',
       'pngMAction','pngJAction', 'clearAction','exitAction', 'powerMenu',
@@ -113,13 +115,14 @@ MBS_Attrs = METADATA_MEMBERS + \
       'progressLbl', 'progressLblBg', 'colorRotateCombo',
       'statusBar', 'mgrM', 'mandelbrotKeyclick', 'scanMarker', 
       'textTitleM', 'mgrJ', 'juliaKeyclick', 'textTitleJ',
-      'placesWidget', 'cxOld', 'cyOld', 'deltaOld', 
+      'placesWidget', 'cxOld', 'cyOld', 'deltaOld', 'nColorCyclic', 'nColorCyclicCombo', 
       'animateAtConstantWidth', 'animateAtConstantWidthAction',  
       'convTest', 'iConvTest', 'figM3D', 'animatePb', 'debugSpiral', 'debugColoring',  
       'shaderAction', 'scansAction', 'placesAction', 'overviewAction', 'coloringAction',
       'smoothModeCombo', 'cython', 'highPrec', 'smoothAction', 'miscAction', 
       'figSize3D', 'flagM3D', 'surface', 'fig3D','fig3D', 'clipCb', 'smoothModeCombo', 
-      'surface', 'm3DCb', 'resetMarker', 'fontSize', 'numba', 'numbaCb', 'dataMandelbrotSet3D', 'colorsMenu', 'allColorsMenu', 'cmapLbl',
+      'surface', 'm3DCb', 'resetMarker', 'fontSize', 'numba', 'numbaCb',
+      'dataMandelbrotSet3D', 'colorsMenu', 'allColorsMenu', 'cmapLbl',
       'deltaLbl', 'mandelbrotMode', 'mandelbrotModeCombo', 'rotateWaitTimeCombo', 
       'juliaMode', 'juliaModeCombo', 'isAnimating', 'spiralCombo', 
       'bandCb', 'dataLbl', 'normCombo', 'normFunc', 'scanPath', 'scanTexts',
@@ -127,7 +130,8 @@ MBS_Attrs = METADATA_MEMBERS + \
       'axM', 'axJulia', 'iterPath', 'flagIterPath', 'iterPathCb', 'colorRotateExecPb', 
       'vmaxSlider', 'vmaxSliderLbl', 'vminSlider', 'vminSliderLbl', 'tiled',
       'flagsMenu', 'cythonAction', 'tiledAction', 'convTestAction', 'debugSpiralAction', 
-      'debugColoringAction', 'debugSpeed', 'debugSpeedAction', 
+      'debugColoringAction', 'debugSpeed', 'debugSpeedAction',
+      'keepResetMarker', 'keepResetMarkerAction', 
      ]
 
 class mandelBrotSetWidget( QMainWindow):
@@ -230,6 +234,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.cbar = None
         self.juliaMode = None
         self.cythonAction = None
+        self.lastFileRead = None
         self.setDefaults()
         self.prepareMenuBar()
         self.prepareCentralPart()
@@ -246,7 +251,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.calcMandelbrotSet()
         self.showMandelbrotSet()
 
-        
         self.figM.set_size_inches( self.figSizeM[0], self.figSizeM[1], forward = True)
         self.geomM = self.mgrM.window.geometry()
         self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
@@ -357,6 +361,12 @@ class mandelBrotSetWidget( QMainWindow):
             setattr( self, selColor, QAction( clr, self))
             getattr( self, selColor).triggered.connect( self.mkColorCb( clr))
             self.colorsMenu.addAction( getattr( self, selColor))
+        self.colorsMenu.addSeparator()
+        for clr in utils.CMAPS_CYCLIC:
+            selColor = "SelColor" + clr
+            setattr( self, selColor, QAction( clr, self))
+            getattr( self, selColor).triggered.connect( self.mkColorCb( clr))
+            self.colorsMenu.addAction( getattr( self, selColor))
         #
         # AllColors
         #
@@ -398,6 +408,14 @@ class mandelBrotSetWidget( QMainWindow):
         self.convTestAction.setStatusTip( "Enable convergence test for animation speed-up. \nThis might introduce artefacts")
         self.convTestAction.setChecked( self.convTest == "True")
         self.flagsMenu.addAction( self.convTestAction)
+        #
+        # keepResetMarker
+        #
+        self.keepResetMarkerAction = QAction('KeepResetMarker', self, checkable = True) 
+        self.keepResetMarkerAction.triggered.connect( self.cb_keepResetMarker)
+        self.keepResetMarkerAction.setStatusTip( "'+' marking the last reset, is not deleted on reset.")
+        self.keepResetMarkerAction.setChecked( self.keepResetMarker == "True")
+        self.flagsMenu.addAction( self.keepResetMarkerAction)
         #
         # animateAtConstantWidth
         #
@@ -532,9 +550,16 @@ class mandelBrotSetWidget( QMainWindow):
         # store
         #
         store = QPushButton("Store")
-        store.setToolTip( "Store .png with meta data in ./places")
+        store.setToolTip( "Store .png incl. metadata in ./places")
         store.clicked.connect( self.cb_store)       
         self.statusBar.addWidget( store)
+        #
+        # store named
+        #
+        storeNamed = QPushButton("StoreNamed")
+        storeNamed.setToolTip( "Store .png incl. metadata in ./places/MBN_<input>.png\nMBN_ files cannot be deleted by mandelbrot.py")
+        storeNamed.clicked.connect( self.cb_storeNamed)       
+        self.statusBar.addWidget( storeNamed)
         #
         # redo
         #
@@ -595,7 +620,26 @@ class mandelBrotSetWidget( QMainWindow):
         self.reversedCb.setChecked( self.flagReversed == "True")
         self.reversedCb.clicked.connect( self.cb_reversed)
         hLayout.addWidget( self.reversedCb)
-        
+        #
+        # cyclic
+        #
+        self.cyclicCb = QCheckBox( "Cyclic CMAP", self)
+        self.cyclicCb.setToolTip( "If enabled, the color map is made cyclic, like prism or flag.")
+        self.cyclicCb.setChecked( self.flagCyclic == "True")
+        self.cyclicCb.clicked.connect( self.cb_cyclic)
+        hLayout.addWidget( self.cyclicCb)
+        #
+        # cyclic colors, set to 128, no choice
+        #
+        #self.nColorCyclicCombo = QComboBox()
+        #self.nColorCyclicCombo.setToolTip( "Resolution of the cyclic color map.")
+        #for elm in NCOLORCYCLIC_VALUES:
+        #    self.nColorCyclicCombo.addItem( str( elm))
+        #self.nColorCyclicCombo.setCurrentIndex( 0)
+        #self.nColorCyclicCombo.activated.connect( self.cb_nColorCyclicCombo )
+        #hLayout.addWidget( self.nColorCyclicCombo)
+        #hLayout.addStretch()
+
         row += 1
         col = 0
         self.gridLayout.addLayout( hLayout, row, col)
@@ -1101,6 +1145,27 @@ class mandelBrotSetWidget( QMainWindow):
         temp.setToolTip( "Zoom out")
         temp.clicked.connect( self.cb_zoomOut)
         hLayout.addWidget( temp)
+        #
+        # zoomhome
+        #
+        temp = QPushButton("ZoomHome")
+        temp.setToolTip( "Zoom back to whole fractal")
+        temp.clicked.connect( self.cb_zoomHome)
+        hLayout.addWidget( temp)
+        #
+        # goto lastRead
+        #
+        temp = QPushButton("LastRead")
+        temp.setToolTip( "Repeat last read")
+        temp.clicked.connect( self.cb_lastRead)
+        hLayout.addWidget( temp)
+        #
+        # clearRM (resetMarker)
+        #
+        temp = QPushButton("ClearRM")
+        temp.setToolTip( "Clear reset marker")
+        temp.clicked.connect( self.cb_clearRM)
+        hLayout.addWidget( temp)
         hLayout.addStretch()
         #
         # IterPath
@@ -1217,9 +1282,10 @@ class mandelBrotSetWidget( QMainWindow):
             #
             # mark the position where 'reset' was called
             #
-            self.resetMarker = plt.text( 0, 0, '', color='cyan',
+            self.resetMarker = plt.text( 0, 0, '', color='blue',
                                          horizontalalignment='center',
-                                         fontsize = 20, 
+                                         fontsize = 18,
+                                         weight = 'bold', 
                                          verticalalignment='center')
             self.textTitleM = \
                 plt.gcf().text( 0.02, 0.99, 
@@ -1257,6 +1323,17 @@ class mandelBrotSetWidget( QMainWindow):
         self.cb_pngM()
         return 
 
+    def cb_storeNamed( self): 
+        #
+        dlg = utils.InputDialog( "Enter file name")
+        if dlg.exec_() == QDialog.Accepted:
+            value = dlg.get_value()
+            if value is None or len( value.strip()) == 0:
+                self.logWidget.append( "storeNamed: no input, return")
+                return 
+        self.cb_pngM( fileName = value)
+        return 
+
     def setColor( self, colorMapName, rotateColorMapIndex, band):
         """
         yes, in general the paramters exist in self already. However,
@@ -1272,17 +1349,31 @@ class mandelBrotSetWidget( QMainWindow):
         #  Copilot: LinearSegmentedColormap → smooth, continuous, 
         #    mathematically defined. Harder to rotate.
         #
-        if self.flagReversed == "True": 
-            self.colorMap = plt.get_cmap( self.colorMapName + "_r", CMAP_MAX)
-            rot_temp = self.colorMap( np.arange( CMAP_MAX))
+        colorMapName = self.colorMapName
+        if self.flagReversed == "True":
+            colorMapName += '_r'
+
+        #
+        # prism and flag are already cyclic
+        #
+        if self.flagCyclic == "True" and \
+           colorMapName != 'flag' and \
+           colorMapName != 'prism':
+            self.colorMap = plt.get_cmap( colorMapName, self.nColorCyclic)
+            rot_temp = self.colorMap( np.linspace( 0, 1, self.nColorCyclic))
+            self.colorMap = matplotlib.colors.ListedColormap( np.tile( rot_temp, (16, 1)))
         else: 
-            self.colorMap = plt.get_cmap( self.colorMapName, CMAP_MAX)
+            self.colorMap = plt.get_cmap( colorMapName, CMAP_MAX)
             #
             # we shift black to the end to paint pixels containing maxIter black
             # and thereby we create a ListedColormap
             #
             temp = self.colorMap( np.arange( CMAP_MAX))
-            rot_temp = np.roll( temp, shift=(CMAP_MAX - 1), axis=0)  # shift black to index 255
+            #
+            # shift black to index (CMAP_MAX - 1)
+            #
+            rot_temp = np.roll( temp, shift=(CMAP_MAX - 1), axis=0)  
+            self.colorMap = matplotlib.colors.ListedColormap( rot_temp)
         #
         # reverse the first 1023 colors, nicer for rotate or not?
         #
@@ -1295,7 +1386,7 @@ class mandelBrotSetWidget( QMainWindow):
         # Copilot: ListedColormap - discrete, easy to manipulate (rotate, shuffle, reorder). 
         #   Perfect for animations or artistic tweaks.
         #
-        self.colorMap = matplotlib.colors.ListedColormap( rot_temp)
+        #self.colorMap = matplotlib.colors.ListedColormap( rot_temp)
         #
         # the rotate slider need a ListedColormap
         #
@@ -1362,9 +1453,14 @@ class mandelBrotSetWidget( QMainWindow):
             return 
 
         self.reversedCb.setChecked( self.flagReversed == "True")
+
+        self.cyclicCb.setChecked( self.flagCyclic == "True")
         
         self.cmapLbl.setText( "CMAP: %s" % self.colorMapName)
         
+        #self.nColorCyclicCombo.setCurrentIndex( 
+        #    self.findCurrentIndex( self.nColorCyclic, NCOLORCYCLIC_VALUES))
+
         self.widthCombo.setCurrentIndex( 
             self.findCurrentIndex( self.widthM, WIDTH_VALUES))
         
@@ -1453,6 +1549,8 @@ class mandelBrotSetWidget( QMainWindow):
 
         self.convTestAction.setChecked( self.convTest == "True")
 
+        self.keepResetMarkerAction.setChecked( self.keepResetMarker == "True")
+
         self.animateAtConstantWidthAction.setChecked( self.animateAtConstantWidth == "True")
 
         self.debugSpiralAction.setChecked( self.debugSpiral == "True")
@@ -1465,19 +1563,22 @@ class mandelBrotSetWidget( QMainWindow):
         
         return
     
-    def createImageMFile( self, ext):
+    def createImageMFile( self, ext, fileName = None):
         # 
         plt.figure( self.figM.number) 
 
         if not os.path.exists( './places'):
             os.mkdir( './places') 
 
-        key = "%g%g%g%d%s%g%s" % \
-            ( getattr( self, 'cxM'), getattr( self, 'cyM'), getattr( self, 'deltaM'), 
-              getattr( self, 'maxIterJ'), getattr( self, 'shaded'), 
-              getattr( self, 'normPar'), getattr( self, 'colorMapName'))
-        temp = hashlib.md5(key.encode()).hexdigest()[:8]  # e.g., 'a3f9c1d2'
-        fName = "./places/MB_%s.%s" % ( temp, ext)
+        if fileName is None: 
+            key = "%g%g%g%d%s%g%s" % \
+                ( getattr( self, 'cxM'), getattr( self, 'cyM'), getattr( self, 'deltaM'), 
+                  getattr( self, 'maxIterJ'), getattr( self, 'shaded'), 
+                  getattr( self, 'normPar'), getattr( self, 'colorMapName'))
+            temp = hashlib.md5(key.encode()).hexdigest()[:8]  # e.g., 'a3f9c1d2'
+            fName = "./places/MB_%s.%s" % ( temp, ext)
+        else:
+            fName = "./places/MBN_%s.%s" % ( fileName, ext)
 
         if os.path.exists( fName): 
             if os.path.exists( './vrsn'): 
@@ -1550,8 +1651,8 @@ class mandelBrotSetWidget( QMainWindow):
 
         return
 
-    def cb_pngM( self):
-        self.createImageMFile( 'png')
+    def cb_pngM( self, fileName = None):
+        self.createImageMFile( 'png', fileName = fileName)
         return
     
     def cb_pngJ( self):
@@ -1648,10 +1749,10 @@ class mandelBrotSetWidget( QMainWindow):
         return
 
     def cb_geometry( self):
-        self.logWidget.append( "self.geometry(): %s" % repr( self.geometry()))
-        self.logWidget.append( "figM %s " % self.mgrM.window.geometry())
+        self.logWidget.append( "cb_geometry: self.geometry(): %s" % repr( self.geometry()))
+        self.logWidget.append( "cb_geometry: figM %s " % self.mgrM.window.geometry())
         if self.debugColoring:
-            self.logWidget.append( "figDebugColoring %s " %
+            self.logWidget.append( "cb_geometry: figDebugColoring %s " %
                                    self.figDebugColoring.canvas.manager.window.geometry())
         return
 
@@ -1693,7 +1794,6 @@ class mandelBrotSetWidget( QMainWindow):
             if colorIndex < 0:
                 colorIndex = CMAP_MAX - 1
             self.cmapRotateSlider.setValue( colorIndex)
-            #self.cmapRotateSliderLbl.setText( "C-Index: %-4d" % self.rotateColorMapIndex)
             if self.stopRequested:
                 self.stopRequested = False
                 self.colorRotateExecPb.setStyleSheet("background-color:%s" % self.progressLblBg)
@@ -1802,8 +1902,12 @@ class mandelBrotSetWidget( QMainWindow):
         #
         widthMOld = self.widthM
         if self.animateAtConstantWidth == "False": 
-            self.widthM = int( self.widthM * 0.5)
-            self.setCurrentIndices()
+            newWidth = int( self.widthM * 0.5)
+            if newWidth in WIDTH_VALUES: 
+                self.widthM = newWidth
+                self.setCurrentIndices()
+            else: 
+                self.logWidget.append( "cb_animate: cannot use 50% of width, not in VALUES")
 
         colorIndexOld = self.rotateColorMapIndex
         for i in range( len( cx)):
@@ -1846,6 +1950,134 @@ class mandelBrotSetWidget( QMainWindow):
         self.calcMandelbrotSet()
         self.showMandelbrotSet()
         self.calcJuliaSet()
+        self.showJuliaSet()
+        return
+
+    def cb_zoomHome( self): 
+        self.setResetMarker()
+        self.cxM = -0.75
+        self.cyM = 0.
+        self.deltaM = 3.
+        self.cxJ = 0.
+        self.cyJ = 0.
+        self.deltaJ = 3.
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        self.calcJuliaSet()
+        self.showJuliaSet()
+        return
+
+    def readFile( self, fName):
+        image = Image.open(fName)
+        hsh = image.info
+        image.close()
+        self.lastFileRead = fName
+        self.logWidget.append( "Reading %s" % ( fName))
+        print( "Reading %s" % ( fName))
+        for elm in hsh:
+            print( "  %-14s : %s" % ( elm, hsh[ elm]))
+        print( "Reading Done")
+
+        self.cxM = float( hsh[ 'cxM'])
+        self.cyM = float( hsh[ 'cyM'])
+        self.deltaM = float( hsh[ 'deltaM'])
+
+        self.colorMapName = hsh[ 'colorMapName']
+        try: 
+            self.rotateColorMapIndex = int( hsh[ 'rotateColorMapIndex'])
+        except: 
+            try: 
+                self.rotateColorMapIndex = int( hsh[ 'rotateColorMap'])
+            except:
+                self.rotateColorMapIndex = 0
+                    
+        self.flagReversed = "False"
+        try: 
+            self.flagReversed = hsh[ 'flagReversed']
+        except:
+            pass
+
+        self.norm = hsh[ 'norm']
+        if self.norm == "LinNormR":
+            self.norm = "LinNorm"
+            self.flagReversed = "True"
+                
+        self.normPar = float( hsh[ 'normPar'])
+            
+        self.band = "False"
+        try: 
+            self.band = hsh[ 'band']
+        except:
+            pass
+            
+        self.flagCyclic = "False"
+        try: 
+            self.flagCyclic = hsh[ 'flagCyclic']
+        except:
+            pass
+
+        self.setColor( self.colorMapName,
+                              self.rotateColorMapIndex,
+                              self.band)
+            
+        self.widthM = int( hsh[ 'widthM'])
+        self.widthJ = int( hsh[ 'widthJ'])
+        self.modulo = int( hsh[ 'modulo'])
+        self.smooth = hsh[ 'smooth']
+        self.maxIterM = int( hsh[ 'maxIterM'])
+        self.maxIterJ = int( hsh[ 'maxIterJ'])
+        self.power = int( hsh[ 'power'])
+            
+
+        self.clip = "False"
+        try: 
+            self.clip = hsh[ 'clip']
+        except:
+            pass
+        self.vmin = 0
+        try: 
+            self.vmin = float( hsh[ 'vmin'])
+        except:
+            pass
+        self.vmax = 1024
+        try: 
+            self.vmax = float( hsh[ 'vmax'])
+        except:
+            pass
+        self.shaded = hsh[ 'shaded']
+        self.scanCircle = hsh[ 'scanCircle']
+        self.vert_exag = 1.
+        try: 
+            self.vert_exag = float( hsh[ 'vert_exag'])
+        except:
+            pass
+        self.interpolation = hsh[ 'interpolation']
+        self.blendMode = hsh[ 'blendMode']
+        self.azDeg = int( hsh[ 'azDeg'])
+        self.altDeg = int( hsh[ 'altDeg'])
+
+        self.setCurrentIndices()        
+
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        self.calcJuliaSet()
+        self.showJuliaSet()
+        return 
+        
+    def cb_lastRead( self):
+        if self.lastFileRead is None:
+            self.logWidget.append( "No file read so far")
+            return
+        self.readFile( self.lastFileRead)
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        self.calcJuliaSet()
+        self.showJuliaSet()
+        return
+        
+    def cb_clearRM( self):
+        self.resetMarker.set( text = r'') 
+        self.showMandelbrotSet()
         self.showJuliaSet()
         return
     
@@ -1906,6 +2138,27 @@ class mandelBrotSetWidget( QMainWindow):
         self.showJuliaSet()
         return 
 
+    def cb_cyclic( self, i):
+        if i:
+            self.flagCyclic = "True" 
+        else:
+            self.flagCyclic = "False"
+        self.setColor( self.colorMapName,
+                       self.rotateColorMapIndex,
+                       self.band)
+        self.showMandelbrotSet()
+        self.showJuliaSet()
+        return 
+
+    def cb_nColorCyclicCombo( self, i):
+        self.nColorCyclic = int( NCOLORCYCLIC_VALUES[i])
+        self.setColor( self.colorMapName,
+                       self.rotateColorMapIndex,
+                       self.band)
+        self.showMandelbrotSet()
+        self.showJuliaSet()
+        return 
+
     def cb_cython( self, i):
         if i:
             self.cython = "True" 
@@ -1956,6 +2209,15 @@ class mandelBrotSetWidget( QMainWindow):
         else:
             self.convTest = "False" 
             self.iConvTest = 0
+        return 
+
+    def cb_keepResetMarker( self, i):
+        if i:
+            self.keepResetMarker = "True" 
+        else:
+            self.keepResetMarker = "False" 
+            self.resetMarker.set( text = r'') 
+            
         return 
 
     def cb_animateAtConstantWidth( self, i):
@@ -2243,7 +2505,10 @@ class mandelBrotSetWidget( QMainWindow):
 
     def setDefaults( self):
 
+        self.keepResetMarker = "True"
         self.flagReversed = "False"
+        self.flagCyclic = "False"
+        self.nColorCyclic = NCOLORCYCLIC_VALUES[0]
         self.isRotating = False
         self.rotateWaitTime = ROTATEWAITTIME_VALUES[0]
         self.colorRotateValue = COLORROTATE_VALUES[0]
@@ -2340,20 +2605,25 @@ class mandelBrotSetWidget( QMainWindow):
         self.setCurrentIndices()
         return 
 
-    def cb_reset( self):
+    def setResetMarker( self):
         #
         # do not set the reset marker, if we look at the whole plot
         #
         if self.deltaM < 2: 
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
-                                  text = r'*', 
+                                  text = r'+', 
                                   color='cyan') 
         else: 
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
                                   text = r'', 
-                                  color='cyan') 
+                                  color='cyan')
+        return 
+
+    def cb_reset( self):
+
+        self.setResetMarker()
         self.setDefaults()
         self.setCurrentIndices()
         
@@ -2603,7 +2873,8 @@ class mandelBrotSetWidget( QMainWindow):
         return 
 
     def cb_onClickMandelbrot( self, event):
-        self.resetMarker.set( text = r'') 
+        if self.keepResetMarker != "True": 
+            self.resetMarker.set( text = r'') 
         #
         # MB-Left: Zoom-in
         #
@@ -3734,6 +4005,8 @@ above mentioned formula, except that z(0) is set to c.\
         label = QLabel("<h3> Coloring</h3>"
 "<ul>"
 "<li> CMap - The color map used for the display of the data. Can be selected from 'Colors' and 'AllColors'</li>"
+"<li> Reversed - Reverse the color map</li>"
+"<li> Cyclic CMAP - Make other color maps cyclic, like prism or flag. CMAPs that give good cyclic CMAPS can be found in Colors below the separator.</li>"
 "<li> C-Index - Rotate the color map by a slider</li>"
 "<li> Rotate CMAP - Continuously rotate the color map by n steps, use WaitTime to slow down the loop.</li>"
 "<li> Animation - Approach a target point in a spiral. No. of turns may be selected. IF -1, we have a linear approach. The A-Factor specifies the approach speed.</li>"
@@ -3804,6 +4077,9 @@ above mentioned formula, except that z(0) is set to c.\
             "<li> Julia Mode: selector for the figure size</li>"
             "<li> Zoom - zoom factor</li>"
             "<li> ZoomOut - undo last zoom</li>"
+            "<li> ZoomHome - Reset center coordinated and delta</li>"
+            "<li> LastRead - Re-read the last file</li>"
+            "<li> ClearRM - Clear reset marker</li>"
             "<li> IterPath: display the iterated sequence of z(n)</li>"
             "<li> cx, cy, Delta: coordinates of the current image </li>"
             "<li> ShowData: if enabled, shows, x, y, data </li>"
@@ -3816,7 +4092,8 @@ above mentioned formula, except that z(0) is set to c.\
             "<h3> The Places </h3>"
             "<ul>"
             "<li> Places - Launch the Places widget to load parameters of interesting places that have been stored before. </li>"
-            "<li> Store - Store an interesting place, i.e. store a .png in the ./places directory. The .png files contains metadata allowing mandelbrot.py to continue operation at the place. </li>"
+            "<li> Store - Store an interesting place, i.e. store a .png in the ./places directory. The .png files contains metadata allowing mandelbrot.py to continue operation at the place. The file names are MB_<hashCode>.png. Files of this king can me deleted by MB-Right</li>"
+            "<li> StoreNamed - Store an interesting place in a named file. Very much like 'Store' except that the user is prompted for the central part of the file name: MBN_<userInput>.png. MBN_ files cannot be deleted by mandelbrot.py </li>"
             "</ul>" 
                 ))
         
@@ -3827,6 +4104,7 @@ above mentioned formula, except that z(0) is set to c.\
             "<li> Cython - The calculation is done in C using the cython interface. </li>"
             "<li> Tiled - The calculation is done multi-threaded with each thread taking care of a tile, a part of the escape count field. </li>"
             "<li> ConvTest - During animated zooms a convergence test can applied allowing to identify members of the Mandelbrot set quickly. At certain regions this method creates artefacts, blobs. If ConTest is not checked, the convergence test is not done. </li>"
+            "<li> KeepResetMarker - the resetMarker is not deleted by zoom-in. Kept as a target marker. </li>"
             "<li> Animate uses constant width - animated zooms are accelerated by reducing the width by a factor of 2. At the endpoint the width is resetted. If this flag is checked, the width is not changed. </li>"
             "<li> DebugSpiral - If checked, debug information for spiral animated zooms is displayed. </li>"
             "<li> DebugColoring - If checked, debug information for coloring is displayed. A histogramm of the escape count field, the normalization function, the normalized data and a color bar. </li>"

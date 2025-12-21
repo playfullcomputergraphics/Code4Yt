@@ -5,10 +5,10 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import glob, os, math
-from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import numpy as np
+from PIL import Image
 
 CMAP_MAX = 1024 # appears also in mandelbrot.py
 
@@ -36,7 +36,7 @@ class places( QMainWindow):
     def __init__(self, app, parent=None):
         QWidget.__init__(self, parent)
         
-        self.setWindowTitle("Places")
+        self.setWindowTitle("Places (MB-Left reads a file incl. metadata, MB-Right deletes, MB-Middle shows)")
         self.app = app
         self.parent = parent
         geoScreen = QDesktopWidget().screenGeometry(-1)
@@ -61,13 +61,13 @@ class places( QMainWindow):
                               screens[1].geometry().y() + 10, 500, 500)
             self.show() # placing show() before the next statement is important!
             self.app.processEvents()
-        self.show()
-        self.parent.logWidget.append( "self.geometry() %s" %
-                               ( repr( self.geometry())))
+        #self.parent.logWidget.append( "places: self.geometry() %s" %
+        #                       ( repr( self.geometry())))
         
         self.prepareMenuBar()
         self.prepareCentralPart()
         self.prepareStatusBar()
+        self.show()
 
         return
 
@@ -97,6 +97,23 @@ class places( QMainWindow):
         self.widgetAction = self.helpMenu.addAction(self.tr("Widget"))
         self.widgetAction.triggered.connect( self.cb_helpWidget)
         return
+
+    def clear_layout(self, layout):
+        if layout is None:
+            return
+
+        while layout.count():
+            item = layout.takeAt(0)
+
+            if item.layout():
+                self.clear_layout(item.layout())
+                item.layout().deleteLater()
+
+            elif item.widget():
+                w = item.widget()
+                w.setParent(None)
+                w.deleteLater()
+        return 
     #    
     # === the central part
     #    
@@ -117,14 +134,9 @@ class places( QMainWindow):
             self.gridLayout = QGridLayout()
             self.w.setLayout( self.gridLayout)
         else:
-            # Clear existing thumbnails
-            while self.gridLayout.count():
-                item = self.gridLayout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
+            self.clear_layout( self.gridLayout) 
                     
-        self.thumbnails = glob.glob( "./places/*.png")
+        self.thumbnails = glob.glob( "./places/MB_*.png")
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
         ncol = int( math.sqrt( len( self.thumbnails)))
@@ -134,7 +146,42 @@ class places( QMainWindow):
             thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
             thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
-            self.gridLayout.addWidget( thumb, i // ncol, i % ncol) 
+            vLayout = QVBoxLayout()
+            vLayout.addWidget( thumb)
+            vLayout.addWidget( QLabel( path.split('/')[-1]))
+            
+            row = (i // ncol)
+            col = i % ncol
+            self.gridLayout.addLayout( vLayout, row, col)
+            iOff = row
+
+        iOff += 1
+        #
+        # horizontal line
+        #
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        self.gridLayout.addWidget(line, iOff, 0, 1, ncol)
+        iOff += 1
+        
+        self.gridLayout.addWidget( QLabel( "Named .png  files"), iOff, 0)
+        iOff += 1
+        self.thumbnails = glob.glob( "./places/MBN_*.png")
+        self.thumbnails.sort( key=os.path.getmtime)
+        self.thumbnails.reverse()
+        for i, path in enumerate( self.thumbnails):
+            thumb = ClickableThumbnail( path)
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled(150, 150))
+            thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
+            thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
+            thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
+            vLayout = QVBoxLayout()
+            vLayout.addWidget( thumb)
+            vLayout.addWidget( QLabel( path.split('/')[-1]))
+            row = (i // ncol) + iOff
+            col = i % ncol
+            self.gridLayout.addLayout( vLayout, row, col) 
 
         return 
     #
@@ -169,99 +216,7 @@ class places( QMainWindow):
 
     def mkFileReadCb( self, fName):
         def f():
-            image = Image.open(fName)
-            hsh = image.info
-            image.close()
-            self.parent.logWidget.append( "Reading %s" % ( fName))
-            print( "Reading %s" % ( fName))
-            for elm in hsh:
-                print( "  %-14s : %s" % ( elm, hsh[ elm]))
-            print( "Reading Done")
-
-            self.parent.cxM = float( hsh[ 'cxM'])
-            self.parent.cyM = float( hsh[ 'cyM'])
-            self.parent.deltaM = float( hsh[ 'deltaM'])
-
-            self.parent.colorMapName = hsh[ 'colorMapName']
-            try: 
-                self.parent.rotateColorMapIndex = int( hsh[ 'rotateColorMapIndex'])
-            except: 
-                try: 
-                    self.parent.rotateColorMapIndex = int( hsh[ 'rotateColorMap'])
-                except:
-                    self.parent.rotateColorMapIndex = 0
-                    
-            self.parent.flagReversed = "False"
-            try: 
-                self.parent.flagReversed = hsh[ 'flagReversed']
-            except:
-                pass
-
-            self.parent.norm = hsh[ 'norm']
-            if self.parent.norm == "LinNormR":
-                self.parent.norm = "LinNorm"
-                self.parent.flagReversed = "True"
-                
-            self.parent.normPar = float( hsh[ 'normPar'])
-            
-            self.parent.band = "False"
-            try: 
-                self.parent.band = hsh[ 'band']
-            except:
-                pass
-
-            self.parent.setColor( self.parent.colorMapName,
-                                  self.parent.rotateColorMapIndex,
-                                  self.parent.band)
-            
-            self.parent.widthM = int( hsh[ 'widthM'])
-            self.parent.widthJ = int( hsh[ 'widthJ'])
-            self.parent.modulo = int( hsh[ 'modulo'])
-            self.parent.smooth = hsh[ 'smooth']
-            self.parent.maxIterM = int( hsh[ 'maxIterM'])
-            self.parent.maxIterJ = int( hsh[ 'maxIterJ'])
-            self.parent.power = int( hsh[ 'power'])
-            
-
-            self.parent.clip = "False"
-            try: 
-                self.parent.clip = hsh[ 'clip']
-            except:
-                pass
-            self.parent.vmin = 0
-            try: 
-                self.parent.vmin = float( hsh[ 'vmin'])
-            except:
-                pass
-            self.parent.vmax = 1024
-            try: 
-                self.parent.vmax = float( hsh[ 'vmax'])
-            except:
-                pass
-            self.parent.shaded = hsh[ 'shaded']
-            self.parent.scanCircle = hsh[ 'scanCircle']
-            self.parent.vert_exag = 1.
-            try: 
-                self.parent.vert_exag = float( hsh[ 'vert_exag'])
-            except:
-                pass
-            self.parent.interpolation = hsh[ 'interpolation']
-            self.parent.blendMode = hsh[ 'blendMode']
-            self.parent.azDeg = int( hsh[ 'azDeg'])
-            self.parent.altDeg = int( hsh[ 'altDeg'])
-
-            
-            #self.parent.colorMap = plt.get_cmap( self.parent.colorMapName)
-            #frac = 1. - float( self.parent.rotateColorMapIndex)/float( CMAP_MAX - 1)
-            #self.parent.colorMapCurrent = self.parent.shiftCmap( self.parent.colorMap, frac)
-
-            self.parent.setCurrentIndices()        
-
-            self.parent.calcMandelbrotSet()
-            self.parent.showMandelbrotSet()
-            self.parent.calcJuliaSet()
-            self.parent.showJuliaSet()
-            
+            self.parent.readFile( fName)
             return
         return f
 
@@ -277,6 +232,10 @@ class places( QMainWindow):
                 
     def mkFileDeleteCb( self, fName):
         def f():
+            if fName.find( "MBN_") > 0:
+                self.parent.logWidget.append( "MBN_ files are not deleted this way")
+                return
+                
             yesNo = QMessageBox()
             ret = yesNo.question(self,'', "Delete %s" % fName, yesNo.Yes | yesNo.No)
             if ret == yesNo.Yes:
@@ -294,8 +253,7 @@ class places( QMainWindow):
         def f():
             plt.figure(1) 
             img = np.asarray(Image.open( fName))
-
-            self.parent.imageMandelbrotSet.set( data = img)
+            self.parent.imM.set( data = img)
             return
         return f
 

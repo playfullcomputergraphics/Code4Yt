@@ -1,4 +1,34 @@
 
+
+21.12.2025
+  New feature: lastRead
+    re-read the file last read
+
+  New feature: ZoomHome
+    reset the center coordinates and delta. All other parameter
+    are not changed.
+
+  New feature: StoreNamed
+    A .png is stored with the central part of the file name being 
+    prompted from the user. The new file name is MBN_<userInput>.png
+    MBN_ files cannot be deleted by mandelbrot.py 
+
+    Note, other file names are MB_<hashCode>.png
+
+  New feature: ClearRM
+    Clears the reset marker.
+
+17.12.2025
+  New feature: keepResetMarker
+    ResetMarker is not removed by zoom-in. 
+    This way it is easy to find a 'place'. 
+
+15.12.2025
+  New feature: "Cyclic" makes all color maps cyclic, like prism and flag.
+
+13.12.2025
+  Buf-fix: SetDefaults() treats cythonAction and tiledAction correct.
+
 13.12.2025
   First checkin
   Youtube videos publicly visible

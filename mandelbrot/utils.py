@@ -7,13 +7,15 @@ from PyQt5.QtWidgets import *
 import math
 import numpy as np
 
-CMAPS = [ 'hot', 'viridis', 'flag', 'prism', 
+CMAPS = [ 'hot', 'viridis', 
           'gnuplot2', 'nipy_spectral', 'jet',
-          'plasma', 'magma', 'inferno', 'twilight', 
-          'rainbow', 'gist_rainbow', 
-          'Greys', 
+          'magma', 'inferno', 
          ]
 
+CMAPS_CYCLIC = [ 'flag', 'prism', 'jet', 'turbo', 
+                 'gist_rainbow', 'hsv', 'twilight', 'Paired', 
+                 'Set1', 
+                ]
 CMAPS_DCT = { 
     'Uniform': ['viridis', 'plasma', 'inferno', 'magma', 'cividis'],
     'Sequential': ['Greys',  'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
@@ -25,7 +27,7 @@ CMAPS_DCT = {
                     'gist_heat', 'copper'], 
     'Diverging': ['PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu',
                   'RdYlBu', 'RdYlGn', 'Spectral', 'coolwarm',
-                  'bwr', 'seismic', 'berlin', 'managua', 'vanimo'], 
+                  'bwr', 'seismic', 'vanimo'], 
     'Cyclic': ['twilight', 'twilight_shifted', 'hsv'], 
     'Qualitative': ['Pastel1', 'Pastel2', 'Paired', 'Accent',
                     'Dark2', 'Set1', 'Set2', 'Set3', 'tab10',
@@ -185,6 +187,24 @@ class LinNormR(Normalize):
 
         return (1. - result)
 
+class InputDialog(QDialog):
+    def __init__(self, prompt="Enter File Name:", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Enter File Name")
 
+        layout = QVBoxLayout(self)
 
+        self.label = QLabel(prompt)
+        layout.addWidget(self.label)
+
+        self.line_edit = QLineEdit()
+        layout.addWidget(self.line_edit)
+
+        self.apply_button = QPushButton("Apply")
+        self.apply_button.clicked.connect(self.accept)
+        layout.addWidget(self.apply_button)
+        return 
+
+    def get_value(self):
+        return self.line_edit.text()
 
