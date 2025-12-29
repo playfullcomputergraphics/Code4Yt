@@ -45,15 +45,16 @@ DPI = 100
 DATA_NORM = 1024
 TEXT_OFFSET = 0.03
 CMAP_MAX = 1024 # appears also in mandelbrotPlaces.py
+RESET_MARKER_COLOR = 'white'
 MODULO_VALUES = [ -1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
-POWER_VALUES = [ 2, 3, 4, 5, 6, 7, 8, 9, 10]
+#POWER_VALUES = [ 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SPIRAL_VALUES = [ 0, -1, 1, 2, 3, 4]
 NORMPAR_VALUES = [ 0.25, 0.05, 0.1, 0.15, 0.2, 
                    0.25, 0.3, 0.35, 0.4, 0.45, 
                    0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 10, 15, 20, 30, 40, 50]
 COLORROTATE_VALUES = [ 1, 5, 4, 3, 2, 1, -1, -2, -3, -4, -5]
 NCOLORCYCLIC_VALUES = [ 128, 256]
-ROTATEWAITTIME_VALUES = [ 0.1, 0.001, 0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.15, 0.2, 0.3]
+ROTATEWAITTIME_VALUES = [ 0.1, 0.001, 0.005, 0.01, 0.02, 0.03, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3]
 NORM_VALUES = [ 'PowerNorm', 'LogNorm',
                 'LinNorm', 'AsinhNorm', 
                 'HistNorm', 'TwoSlopeNorm', 'StretchNorm', 
@@ -105,9 +106,7 @@ MBS_Attrs = METADATA_MEMBERS + \
       'colorMap', 'modFactor', 'scanCircle', 'reversedCb', 'cyclicCb',    
       'scanPoints', 'zoom', 'cxM', 'cyM', 'deltaM', 'cxJ', 'cyJ', 'deltaJ',
       'progress', 'imM', 'imageJuliaSet','menuBar', 'fileMenu',
-      'pngMAction','pngJAction', 'clearAction','exitAction', 'powerMenu',
-      'Power to  2', 'Power to  3', 'Power to  4', 'Power to  5', 'Power to  6',
-      'Power to  7', 'Power to  8', 'Power to  9', 'Power to 10',
+      'pngMAction','pngJAction', 'clearAction','exitAction', 
       'menuBarRight', 'helpMenu', 'gridLayout', 'spiral', 'rotateColorsPb', 
       'interpolationModeCombo', 'scanCircleCb', 'logWidget', 
       'shadedCb', 'vert_exagModeCombo', 'clipCb', 'figSizeC', 'cbar', 
@@ -131,7 +130,8 @@ MBS_Attrs = METADATA_MEMBERS + \
       'vmaxSlider', 'vmaxSliderLbl', 'vminSlider', 'vminSliderLbl', 'tiled',
       'flagsMenu', 'cythonAction', 'tiledAction', 'convTestAction', 'debugSpiralAction', 
       'debugColoringAction', 'debugSpeed', 'debugSpeedAction',
-      'keepResetMarker', 'keepResetMarkerAction', 
+      'centerHsh', 'centerMenu', 'resetMarkerAction', 
+      'lastReadLbl', 
      ]
 
 class mandelBrotSetWidget( QMainWindow):
@@ -235,6 +235,8 @@ class mandelBrotSetWidget( QMainWindow):
         self.juliaMode = None
         self.cythonAction = None
         self.lastFileRead = None
+        self.centerHsh = {}
+        
         self.setDefaults()
         self.prepareMenuBar()
         self.prepareCentralPart()
@@ -301,8 +303,13 @@ class mandelBrotSetWidget( QMainWindow):
            name.find( 'AllColor') == 0: 
             #print( "calling super'%s'," %  name)
             super( mandelBrotSetWidget, self).__setattr__(name, value)
-        else: 
-            print( " unknown attribute: '%s'," %  name)
+        else:
+            #
+            # the MBN_ files become members of self after read becaus of center
+            #
+            if name.find( 'MBN_') != 0 and \
+               name != 'Center':
+                print( " unknown attribute: '%s'," %  name)
             super( mandelBrotSetWidget, self).__setattr__(name, value)
             #raise ValueError( "mandelBrotSetWidget.__setattr__: unknown attribute %s" % ( name))
     #
@@ -409,14 +416,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.convTestAction.setChecked( self.convTest == "True")
         self.flagsMenu.addAction( self.convTestAction)
         #
-        # keepResetMarker
-        #
-        self.keepResetMarkerAction = QAction('KeepResetMarker', self, checkable = True) 
-        self.keepResetMarkerAction.triggered.connect( self.cb_keepResetMarker)
-        self.keepResetMarkerAction.setStatusTip( "'+' marking the last reset, is not deleted on reset.")
-        self.keepResetMarkerAction.setChecked( self.keepResetMarker == "True")
-        self.flagsMenu.addAction( self.keepResetMarkerAction)
-        #
         # animateAtConstantWidth
         #
         self.animateAtConstantWidthAction = QAction('Animate uses constant width', self, checkable = True) 
@@ -462,19 +461,23 @@ class mandelBrotSetWidget( QMainWindow):
         #
         #self.highPrecAction = QAction('HIGHPREC', self, checkable = True)        
         #self.highPrecAction.triggered.connect( self.cb_highPrec)
-        #self.highPrecAction.setStatusTip('Enable multithreading')
+        #self.highPrecAction.setStatusTip('Enable high precision')
         #self.highPrecAction.setChecked( self.highPrec == "True")
         #self.flagsMenu.addAction( self.highPrecAction)
         #
+        # Center
+        #
+        self.centerMenu = self.menuBar.addMenu('Center')
+        self.addCenterItem( name = 'Center', cx = -0.75, cy = 0)
+        #
         # Power
         #
-        self.powerMenu = self.menuBar.addMenu('Power')
-        for i in range( 2, 11):
-            temp = "Power to %2d" % i
-            setattr( self, temp, QAction( temp, self))
-            getattr( self, temp).triggered.connect( self.mkPowerCb( i))
-            self.powerMenu.addAction( getattr( self, temp))
-
+        #self.powerMenu = self.menuBar.addMenu('Power')
+        #for i in range( 2, 11):
+        #    temp = "Power to %2d" % i
+        #    setattr( self, temp, QAction( temp, self))
+        #    getattr( self, temp).triggered.connect( self.mkPowerCb( i))
+        #    self.powerMenu.addAction( getattr( self, temp))
         #
         # Test
         #
@@ -518,20 +521,26 @@ class mandelBrotSetWidget( QMainWindow):
         self.scansAction = self.helpMenu.addAction(self.tr("Julia Scans"))
         self.scansAction.triggered.connect( self.cb_helpJuliaScans)
         #
-        # Misc
-        #
-        self.miscAction = self.helpMenu.addAction(self.tr("Misc"))
-        self.miscAction.triggered.connect( self.cb_helpMisc)
-        #
         # Places
         #
         self.placesAction = self.helpMenu.addAction(self.tr("Places"))
         self.placesAction.triggered.connect( self.cb_helpPlaces)
         #
+        # ResetMarker
+        #
+        self.resetMarkerAction = self.helpMenu.addAction(self.tr("ResetMarker"))
+        self.resetMarkerAction.triggered.connect( self.cb_helpResetMarker)
+        #
         # Flags
         #
         self.flagsAction = self.helpMenu.addAction(self.tr("Flags"))
         self.flagsAction.triggered.connect( self.cb_helpFlags)
+        #
+        # Misc
+        #
+        self.miscAction = self.helpMenu.addAction(self.tr("Misc"))
+        self.miscAction.triggered.connect( self.cb_helpMisc)
+
         return
     #
     # === the status bar
@@ -563,10 +572,10 @@ class mandelBrotSetWidget( QMainWindow):
         #
         # redo
         #
-        redo = QPushButton("Redo")
-        redo.setToolTip( "Re-calc and re-show the plot.")
-        redo.clicked.connect( self.cb_redo)       
-        self.statusBar.addPermanentWidget( redo)
+        #redo = QPushButton("Redo")
+        #redo.setToolTip( "Re-calc and re-show the plot.")
+        #redo.clicked.connect( self.cb_redo)       
+        #self.statusBar.addPermanentWidget( redo)
         #
         # stop
         #
@@ -1048,7 +1057,7 @@ class mandelBrotSetWidget( QMainWindow):
         # scanCircle
         #
         self.scanCircleCb = QCheckBox( "Scan Circle", self)
-        self.scanCircleCb.setToolTip( "Select circular or linear scans.")
+        self.scanCircleCb.setToolTip( "Select circular or polygon scans.")
         self.scanCircleCb.clicked.connect( self.cb_scanCircle)
         hLayout.addWidget( self.scanCircleCb)
         hLayout.addStretch()
@@ -1056,7 +1065,7 @@ class mandelBrotSetWidget( QMainWindow):
         # Exec Scan
         #
         temp = QPushButton("Execute Scan")
-        temp.setToolTip( "Exec scan")
+        temp.setToolTip( "Execute Jula scan")
         temp.clicked.connect( self.cb_execScan)
         hLayout.addWidget( temp)
         col = 1
@@ -1160,6 +1169,11 @@ class mandelBrotSetWidget( QMainWindow):
         temp.clicked.connect( self.cb_lastRead)
         hLayout.addWidget( temp)
         #
+        # lastRead file name
+        #
+        self.lastReadLbl = QLabel("n.n.")
+        hLayout.addWidget( self.lastReadLbl)
+        #
         # clearRM (resetMarker)
         #
         temp = QPushButton("ClearRM")
@@ -1167,14 +1181,6 @@ class mandelBrotSetWidget( QMainWindow):
         temp.clicked.connect( self.cb_clearRM)
         hLayout.addWidget( temp)
         hLayout.addStretch()
-        #
-        # IterPath
-        #
-        self.iterPathCb = QCheckBox( "IterPath", self)
-        self.iterPathCb.setToolTip( "Path of the iterated z values")
-        self.iterPathCb.setChecked( self.iterPath == "True") 
-        self.iterPathCb.clicked.connect( self.cb_iterPath)
-        hLayout.addWidget( self.iterPathCb)
         row += 1
         col = 0
         self.gridLayout.addLayout( hLayout, row, col, 1, 3)
@@ -1210,6 +1216,14 @@ class mandelBrotSetWidget( QMainWindow):
         self.dataLbl = QLabel( "Data")
         hLayout.addWidget( self.dataLbl)
         hLayout.addStretch()
+        #
+        # IterPath
+        #
+        self.iterPathCb = QCheckBox( "IterPath", self)
+        self.iterPathCb.setToolTip( "Path of the iterated z values")
+        self.iterPathCb.setChecked( self.iterPath == "True") 
+        self.iterPathCb.clicked.connect( self.cb_iterPath)
+        hLayout.addWidget( self.iterPathCb)
         row += 1
         col = 0
         self.gridLayout.addLayout( hLayout, row, col, 1, 3)
@@ -1285,7 +1299,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.resetMarker = plt.text( 0, 0, '', color='blue',
                                          horizontalalignment='center',
                                          fontsize = 18,
-                                         weight = 'bold', 
+                                         weight = 'normal', 
                                          verticalalignment='center')
             self.textTitleM = \
                 plt.gcf().text( 0.02, 0.99, 
@@ -1302,15 +1316,61 @@ class mandelBrotSetWidget( QMainWindow):
 
         return 
 
-    def cb_redo( self):
-        """
-        debugging feature
-        """
-        self.calcMandelbrotSet()
-        self.calcJuliaSet()
-        self.showMandelbrotSet()
-        self.showJuliaSet()
-        return
+    def mkCenterCb( self, name):
+        def f():
+            #self.logWidget.append( "mkCenter: resetMarker to %s: (%g, %g)" % 
+            #                       (name, self.centerHsh[ name][ 'cx'], self.centerHsh[ name][ 'cy']))
+            self.resetMarker.set( x = self.centerHsh[ name][ 'cx'], 
+                                  y = self.centerHsh[ name][ 'cy'], 
+                                  text = r'+', 
+                                  color=RESET_MARKER_COLOR)
+            self.lastFileRead = self.centerHsh[ name][ 'fName'] 
+            temp = self.trimCenterName( self.lastFileRead)
+            self.lastReadLbl.setText( temp)
+            return
+        return f
+
+    def trimCenterName( self, name):
+        if name.find( './places/') == 0:
+            name = name[ 9:]
+        if name.find( 'MBN_') == 0:
+            name = name[ 4:]
+        if name.find( 'MB_') == 0:
+            name = name[ 3:]
+        if name.find( '.png') > 0:
+            name = name[:-4]
+        return name
+    
+    def addCenterItem( self, name = None, cx = None, cy = None):
+        #
+        #
+        #
+        fName = name
+        name = self.trimCenterName( name)
+            
+        if name in self.centerHsh.keys():
+            #self.logWidget.append( "addCenterItem: %s exists already" % (name))
+            return 
+            
+        temp = "%s" % name
+        self.centerHsh[ name] = {}
+        self.centerHsh[ name][ 'cx'] = cx
+        self.centerHsh[ name][ 'cy'] = cy
+        self.centerHsh[ name][ 'fName'] = fName
+        setattr( self, temp, QAction( temp, self))
+        getattr( self, temp).triggered.connect( self.mkCenterCb( name))
+        self.centerMenu.addAction( getattr( self, temp))
+        return 
+    
+    #def cb_redo( self):
+    #    """
+    #    debugging feature
+    #    """
+    #    self.calcMandelbrotSet()
+    #    self.calcJuliaSet()
+    #    self.showMandelbrotSet()
+    #    self.showJuliaSet()
+    #    return
     
     def cb_places( self): 
         # 
@@ -1415,6 +1475,7 @@ class mandelBrotSetWidget( QMainWindow):
             return 
         return f
 
+    """
     def mkPowerCb( self, i):
         def f():
             self.power = i
@@ -1430,7 +1491,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.showJuliaSet()
             return 
         return f
-
+    """
     
     def findCurrentIndex( self, x, X):
         '''
@@ -1549,8 +1610,6 @@ class mandelBrotSetWidget( QMainWindow):
 
         self.convTestAction.setChecked( self.convTest == "True")
 
-        self.keepResetMarkerAction.setChecked( self.keepResetMarker == "True")
-
         self.animateAtConstantWidthAction.setChecked( self.animateAtConstantWidth == "True")
 
         self.debugSpiralAction.setChecked( self.debugSpiral == "True")
@@ -1590,6 +1649,9 @@ class mandelBrotSetWidget( QMainWindow):
 
         plt.savefig(fName)
 
+        temp = self.trimCenterName( fName)
+        self.lastReadLbl.setText( temp)
+        
         im = Image.open(fName)
         meta = PngImagePlugin.PngInfo()
         print( "Writing %s" % fName)
@@ -1972,6 +2034,8 @@ class mandelBrotSetWidget( QMainWindow):
         hsh = image.info
         image.close()
         self.lastFileRead = fName
+        temp = self.trimCenterName( fName)
+        self.lastReadLbl.setText( temp)
         self.logWidget.append( "Reading %s" % ( fName))
         print( "Reading %s" % ( fName))
         for elm in hsh:
@@ -2027,7 +2091,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.maxIterM = int( hsh[ 'maxIterM'])
         self.maxIterJ = int( hsh[ 'maxIterJ'])
         self.power = int( hsh[ 'power'])
-            
 
         self.clip = "False"
         try: 
@@ -2056,6 +2119,8 @@ class mandelBrotSetWidget( QMainWindow):
         self.azDeg = int( hsh[ 'azDeg'])
         self.altDeg = int( hsh[ 'altDeg'])
 
+        self.addCenterItem( name = fName, cx = self.cxM, cy = self.cyM)
+        
         self.setCurrentIndices()        
 
         self.calcMandelbrotSet()
@@ -2209,15 +2274,6 @@ class mandelBrotSetWidget( QMainWindow):
         else:
             self.convTest = "False" 
             self.iConvTest = 0
-        return 
-
-    def cb_keepResetMarker( self, i):
-        if i:
-            self.keepResetMarker = "True" 
-        else:
-            self.keepResetMarker = "False" 
-            self.resetMarker.set( text = r'') 
-            
         return 
 
     def cb_animateAtConstantWidth( self, i):
@@ -2505,7 +2561,6 @@ class mandelBrotSetWidget( QMainWindow):
 
     def setDefaults( self):
 
-        self.keepResetMarker = "True"
         self.flagReversed = "False"
         self.flagCyclic = "False"
         self.nColorCyclic = NCOLORCYCLIC_VALUES[0]
@@ -2549,7 +2604,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.maxIterJCombo.setCurrentIndex( 0) 
         self.modulo = MODULO_VALUES[0]
         self.modFactor= 2
-        self.power = POWER_VALUES[0]
+        self.power = 2
         self.norm = NORM_VALUES[0]        
         self.normPar = NORMPAR_VALUES[0]
         if self.normParCombo is not None:
@@ -2613,12 +2668,12 @@ class mandelBrotSetWidget( QMainWindow):
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
                                   text = r'+', 
-                                  color='cyan') 
+                                  color=RESET_MARKER_COLOR) 
         else: 
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
                                   text = r'', 
-                                  color='cyan')
+                                  color=RESET_MARKER_COLOR)
         return 
 
     def cb_reset( self):
@@ -2873,8 +2928,6 @@ class mandelBrotSetWidget( QMainWindow):
         return 
 
     def cb_onClickMandelbrot( self, event):
-        if self.keepResetMarker != "True": 
-            self.resetMarker.set( text = r'') 
         #
         # MB-Left: Zoom-in
         #
@@ -4080,20 +4133,31 @@ above mentioned formula, except that z(0) is set to c.\
             "<li> ZoomHome - Reset center coordinated and delta</li>"
             "<li> LastRead - Re-read the last file</li>"
             "<li> ClearRM - Clear reset marker</li>"
-            "<li> IterPath: display the iterated sequence of z(n)</li>"
-            "<li> cx, cy, Delta: coordinates of the current image </li>"
-            "<li> ShowData: if enabled, shows, x, y, data </li>"
+            "<li> IterPath: Display the iterated sequence of z(n)</li>"
+            "<li> Delta: Width of the current image </li>"
+            "<li> ShowData: If enabled, shows, x, y, data </li>"
             "<ul>"
                 ))
         
         
+    def cb_helpResetMarker(self):
+        QMessageBox.about(self, self.tr("Help ResetMarker"), self.tr(
+            "<h3> The ResetMarker </h3>"
+            "<ul>"
+            "<li> The ResetMarker is a '+' sign printed at a certain position of the image displayed in the Mandelbrot Set figure. </li>"
+            "<li> The position can be the center of the region of interest which was visible when 'Reset' was clicked. Hence the name.</li>"
+            "<li> The position can also by selected an action widget below 'Center'. These are the centers of the .png files read. </li>"
+            "<li> The reset marker remains visible until 'ClearRM' is clicked. </li>"
+            "</ul>" 
+                ))
+        
     def cb_helpPlaces(self):
-        QMessageBox.about(self, self.tr("Help Place"), self.tr(
+        QMessageBox.about(self, self.tr("Help Places"), self.tr(
             "<h3> The Places </h3>"
             "<ul>"
             "<li> Places - Launch the Places widget to load parameters of interesting places that have been stored before. </li>"
-            "<li> Store - Store an interesting place, i.e. store a .png in the ./places directory. The .png files contains metadata allowing mandelbrot.py to continue operation at the place. The file names are MB_<hashCode>.png. Files of this king can me deleted by MB-Right</li>"
-            "<li> StoreNamed - Store an interesting place in a named file. Very much like 'Store' except that the user is prompted for the central part of the file name: MBN_<userInput>.png. MBN_ files cannot be deleted by mandelbrot.py </li>"
+            "<li> Store - Store an interesting place, i.e. store a .png in the ./places directory. The .png files contains metadata allowing mandelbrot.py to continue operation at the place. The file names are MB_'hashCode'.png. Files of this kind can me deleted by MB-Right</li>"
+            "<li> StoreNamed - Store an interesting place in a named file. Very much like 'Store' except that the user is prompted for the central part of the file name: MBN_'userInput'.png. MBN_ files cannot be deleted by mandelbrot.py </li>"
             "</ul>" 
                 ))
         
@@ -4104,11 +4168,10 @@ above mentioned formula, except that z(0) is set to c.\
             "<li> Cython - The calculation is done in C using the cython interface. </li>"
             "<li> Tiled - The calculation is done multi-threaded with each thread taking care of a tile, a part of the escape count field. </li>"
             "<li> ConvTest - During animated zooms a convergence test can applied allowing to identify members of the Mandelbrot set quickly. At certain regions this method creates artefacts, blobs. If ConTest is not checked, the convergence test is not done. </li>"
-            "<li> KeepResetMarker - the resetMarker is not deleted by zoom-in. Kept as a target marker. </li>"
             "<li> Animate uses constant width - animated zooms are accelerated by reducing the width by a factor of 2. At the endpoint the width is resetted. If this flag is checked, the width is not changed. </li>"
             "<li> DebugSpiral - If checked, debug information for spiral animated zooms is displayed. </li>"
             "<li> DebugColoring - If checked, debug information for coloring is displayed. A histogramm of the escape count field, the normalization function, the normalized data and a color bar. </li>"
-            "<li> DebugSpeed - If checked, the elepased time for the computations are written to the log widget </li>"
+            "<li> DebugSpeed - If checked, the elapsed time for the computations is written to the log widget </li>"
 
             "</ul>" 
                 ))

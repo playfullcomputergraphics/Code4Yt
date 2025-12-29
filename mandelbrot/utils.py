@@ -8,7 +8,7 @@ import math
 import numpy as np
 
 CMAPS = [ 'hot', 'viridis', 
-          'gnuplot2', 'nipy_spectral', 'jet',
+          'gnuplot2', 'nipy_spectral',
           'magma', 'inferno', 
          ]
 
