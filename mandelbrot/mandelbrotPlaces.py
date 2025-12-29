@@ -140,6 +140,9 @@ class places( QMainWindow):
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
         ncol = int( math.sqrt( len( self.thumbnails)))
+        if ncol == 0: 
+            ncol = 1
+        iOff = 0
         for i, path in enumerate( self.thumbnails):
             thumb = ClickableThumbnail( path)
             thumb.setPixmap(QPixmap(thumb.image_path).scaled(150, 150))
