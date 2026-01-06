@@ -45,7 +45,6 @@ DPI = 100
 DATA_NORM = 1024
 TEXT_OFFSET = 0.03
 CMAP_MAX = 1024 # appears also in mandelbrotPlaces.py
-RESET_MARKER_COLOR = 'white'
 MODULO_VALUES = [ -1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 #POWER_VALUES = [ 2, 3, 4, 5, 6, 7, 8, 9, 10]
 SPIRAL_VALUES = [ 0, -1, 1, 2, 3, 4]
@@ -69,7 +68,7 @@ ALTDEG_VALUES = [ 10, 1, 5, 20, 30, 40, 50, 60, 70, 80, 90]
 ANIMATIONCOLOR_VALUES = [ 'Yes', 'No']
 ANIMATIONFACTOR_VALUES = [ 0.97, 0.99, 0.98, 0.97, 0.96, 0.95]
 BLEND_MODE_VALUES = [ 'overlay', 'hsv', 'soft'] 
-VERT_EXAG_VALUES = [ 1., 1.5, 2., 3., 4., 5., 10.]
+VERT_EXAG_VALUES = [ 1., 1.5, 2., 3., 4., 5., 10., 20, 50.]
 
 MAX_ITER_VALUES = [ 512, 16, 32, 64, 128, 256, 384, 512, 768,
                     1024, 1536, 2048, 4096, 8192, 16384, 32768]
@@ -125,13 +124,13 @@ MBS_Attrs = METADATA_MEMBERS + \
       'deltaLbl', 'mandelbrotMode', 'mandelbrotModeCombo', 'rotateWaitTimeCombo', 
       'juliaMode', 'juliaModeCombo', 'isAnimating', 'spiralCombo', 
       'bandCb', 'dataLbl', 'normCombo', 'normFunc', 'scanPath', 'scanTexts',
-      'redoAction', 'ax3D', 'showDataCb', 'axDebugSpiral', 'axDebugColoring',  
+      'redoAction', 'ax3D', 'axDebugSpiral', 'axDebugColoring',  
       'axM', 'axJulia', 'iterPath', 'flagIterPath', 'iterPathCb', 'colorRotateExecPb', 
       'vmaxSlider', 'vmaxSliderLbl', 'vminSlider', 'vminSliderLbl', 'tiled',
       'flagsMenu', 'cythonAction', 'tiledAction', 'convTestAction', 'debugSpiralAction', 
       'debugColoringAction', 'debugSpeed', 'debugSpeedAction',
       'centerHsh', 'centerMenu', 'resetMarkerAction', 
-      'lastReadLbl', 
+      'lastReadLbl', 'rmColor', 'rmColorAction', 
      ]
 
 class mandelBrotSetWidget( QMainWindow):
@@ -146,6 +145,61 @@ class mandelBrotSetWidget( QMainWindow):
         self.app = app
         self.fontSize = fontSize
         self.modeOperation = modeOperation # e.g. 'demo'
+
+        self.findFigSizes()
+        #
+        # matplotlib interactive mode
+        #
+        plt.ion()
+
+        self.initMembers() 
+        
+        self.setDefaults()
+
+        self.prepareMenuBar()
+        self.prepareCentralPart()
+        self.prepareStatusBar()
+        #
+        # setCurrentIndices() called also by setDefaults(),
+        # however, it is skipped because the widgets need
+        # to exist in advance
+        #
+        self.setCurrentIndices()
+        
+        self.prepareMFigure()
+
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+
+        self.figM.set_size_inches( self.figSizeM[0], self.figSizeM[1], forward = True)
+        self.geomM = self.mgrM.window.geometry()
+        self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
+
+        if self.modeOperation.lower() == 'demo': 
+            screens = self.app.screens()
+            if len( screens) < 2:
+                print( "\n__init__(): demo mode only at DownPc, exiting\n") 
+                sys.exit( 255) 
+            #self.setFixedSize( 562, 664)
+            self.setGeometry( screens[1].geometry().x() + 870,
+                              screens[1].geometry().y() + 10, 586, 650)
+            self.show() # placing show() before the next statement is important!
+            self.mgrM.window.setGeometry( 3845, 530, self.geomM.width(), self.geomM.height())
+            self.app.processEvents()
+        self.show()
+        #
+        # make sure MBS_ATTR is not polluted
+        # +++
+        for name in MBS_Attrs:
+            try:
+                temp = getattr( self, name)
+            except:
+                #print( "__init__: %s is not in self" % name)
+                pass
+
+        return
+
+    def findFigSizes( self): 
 
         #screen = QDesktopWidget().screenGeometry(-1)
         cm = 1/2.54  # centimeters in inches
@@ -167,34 +221,23 @@ class mandelBrotSetWidget( QMainWindow):
 
         width = WIDTH_VALUES[0] # 1000
         """
-        workflow:
-          - the figure size is calculated from the width and the resolution
-          - a correction factor takes into account different screen sizes
-          - use setGeometry only for positioning the figure
-            self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
+          note: use setGeometry only for positioning the figure
+                self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
         """
-        #corr = 0.85*1920./float( self.screen.size().width())
-        corr = 0.85
-        figSizeInch = width*corr / self.dpi
-        self.figSizeHuge = ( figSizeInch*2.0, figSizeInch*2.0)
-        self.figSizeLarge = ( figSizeInch*1.5, figSizeInch*1.5)
-        self.figSizeBig = ( figSizeInch, figSizeInch)
-        self.figSizeMedium = ( figSizeInch*0.8, figSizeInch*0.8)
-        self.figSizeSmall = ( figSizeInch*0.6, figSizeInch*0.6)
-        self.figSizeTiny = ( figSizeInch*0.4, figSizeInch*0.4)
+        figSizeInch = width / self.dpi
+        self.figSizeHuge = ( figSizeInch*1.7, figSizeInch*1.7)
+        self.figSizeLarge = ( figSizeInch*1.2, figSizeInch*1.2)
+        self.figSizeBig = ( figSizeInch*0.85, figSizeInch*0.85)
+        self.figSizeMedium = ( figSizeInch*0.7, figSizeInch*0.7)
+        self.figSizeSmall = ( figSizeInch*0.5, figSizeInch*0.5)
+        self.figSizeTiny = ( figSizeInch*0.35, figSizeInch*0.35)
             
         self.figSizeM = self.figSizeBig
         self.figSizeJ = self.figSizeBig
         self.figSize3D = self.figSizeBig
-        
-        font = QFont( 'Sans Serif')
-        #if self.screen.size().width() <= 1920:
-        #    font.setPixelSize( 12)
-        #else:
-        #    font.setPixelSize( 22)
-        self.app.setFont( font)
+        return 
 
-        plt.ion()
+    def initMembers( self): 
 
         self.maxIterMCombo = None
         self.maxIterJCombo = None
@@ -236,76 +279,23 @@ class mandelBrotSetWidget( QMainWindow):
         self.cythonAction = None
         self.lastFileRead = None
         self.centerHsh = {}
-        
-        self.setDefaults()
-        self.prepareMenuBar()
-        self.prepareCentralPart()
-        self.prepareStatusBar()
-        #
-        # setCurrentIndices() called also by setDefaults(),
-        # however, it is skipped because the widgets need
-        # to exist
-        #
-        self.setCurrentIndices()
-        
-        self.prepareMFigure()
+        return 
 
-        self.calcMandelbrotSet()
-        self.showMandelbrotSet()
-
-        self.figM.set_size_inches( self.figSizeM[0], self.figSizeM[1], forward = True)
-        self.geomM = self.mgrM.window.geometry()
-        self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
-
-        if self.modeOperation.lower() == 'demo': 
-            screens = self.app.screens()
-            if len( screens) < 2:
-                print( "\n__init__(): demo mode only at DownPc, exiting\n") 
-                sys.exit( 255) 
-            #self.setFixedSize( 562, 664)
-            self.setGeometry( screens[1].geometry().x() + 870,
-                              screens[1].geometry().y() + 10, 586, 650)
-            self.show() # placing show() before the next statement is important!
-            self.mgrM.window.setGeometry( 3845, 530, self.geomM.width(), self.geomM.height())
-            self.app.processEvents()
-        self.show()
-        #if self.fontSize > 12: 
-        #    self.setGeometry( 2000, 1102, 710, 800)
-        #else: 
-        #    self.setGeometry( 2000, 1102, 600, 584)
-
-        #
-        # make sure MBS_ATTR is not polluted
-        # +++
-        for name in MBS_Attrs:
-            try:
-                temp = getattr( self, name)
-            except:
-                #print( "__init__: %s is not in self" % name)
-                pass
-
-        #self.logWidget.append( "Width %d px, Height %d px" %
-        #                       ( self.screen.size().width(), self.screen.size().height()))
-        #self.logWidget.append( "Width %g in, Height %g in" %
-        #                       ( self.screenWidthIn, self.screenHeightIn))
-        #self.logWidget.append( "figSizeInch %s, dpi %d" %
-        #                       ( repr( self.figSizeM), self.dpi))
-        #self.logWidget.append( "self.geometry() %s" %
-        #                       ( repr( self.geometry())))
-        
-        #self.app.processEvents()
-        return
-
-    def __setattr__( self, name, value): 
+    def __setattr__( self, name, value):
+        """
+        +++
+        this function protects agains typos. members can only be set, 
+        if they have been defined
+        """
         #print( "mandelBrotSetWidget.__setattr__: name %s, value %s" % (name, value))
         if name in MBS_Attrs or \
            name.find( 'SelColor') == 0 or \
            name.find( 'AllColor') == 0: 
-            #print( "calling super'%s'," %  name)
             super( mandelBrotSetWidget, self).__setattr__(name, value)
         else:
             #
-            # the MBN_ files become members of self after read becaus of center
+            # the MBN_ files become members of self,
+            # needed by 'center' feature
             #
             if name.find( 'MBN_') != 0 and \
                name != 'Center':
@@ -359,21 +349,33 @@ class mandelBrotSetWidget( QMainWindow):
         self.exitAction = QAction('Exit', self)        
         self.exitAction.triggered.connect( sys.exit)
         self.fileMenu.addAction( self.exitAction)
-        #
+         #
         # Colors
         #
+        """
+        Why your temporary variable works
+        Qt takes ownership of the QAction when you add it to a menu:
+        self.colorsMenu.addAction(temp)
+
+        At that moment:
+        - The menu becomes the parent/owner of the action.
+        - Qt’s parent–child memory management ensures the action stays alive.
+        - Python’s temporary variable temp can safely go out of scope.
+        - The action will remain functional until the menu is destroyed.
+        So you do not need to store the action on self unless you want
+        to reference it later for some reason (e.g., enabling/disabling
+        it dynamically).
+        """
         self.colorsMenu = self.menuBar.addMenu('Colors')
         for clr in utils.CMAPS:
-            selColor = "SelColor" + clr
-            setattr( self, selColor, QAction( clr, self))
-            getattr( self, selColor).triggered.connect( self.mkColorCb( clr))
-            self.colorsMenu.addAction( getattr( self, selColor))
+            temp = QAction( clr, self)
+            temp.triggered.connect( self.mkColorCb( clr))
+            self.colorsMenu.addAction( temp)
         self.colorsMenu.addSeparator()
         for clr in utils.CMAPS_CYCLIC:
-            selColor = "SelColor" + clr
-            setattr( self, selColor, QAction( clr, self))
-            getattr( self, selColor).triggered.connect( self.mkColorCb( clr))
-            self.colorsMenu.addAction( getattr( self, selColor))
+            temp = QAction( clr, self)
+            temp.triggered.connect( self.mkColorCb( clr))
+            self.colorsMenu.addAction( temp)
         #
         # AllColors
         #
@@ -381,10 +383,9 @@ class mandelBrotSetWidget( QMainWindow):
         for elm in list( utils.CMAPS_DCT.keys()):
             subMenu = self.allColorsMenu.addMenu( elm)
             for clr in utils.CMAPS_DCT[elm]:
-                allClr = "AllColor" + clr
-                setattr( self, allClr, QAction( clr, self))
-                getattr( self, allClr).triggered.connect( self.mkColorCb( clr))
-                subMenu.addAction( getattr( self, allClr))
+                temp = QAction( clr, self)
+                temp.triggered.connect( self.mkColorCb( clr))
+                subMenu.addAction( temp)
         #
         # flags
         #
@@ -407,6 +408,14 @@ class mandelBrotSetWidget( QMainWindow):
             self.tiledAction.setStatusTip('Enable multithreading')
             self.tiledAction.setChecked( self.tiled == "True")
             self.flagsMenu.addAction( self.tiledAction)
+        #
+        # ResetMarker black/white
+        #
+        self.rmColorAction = QAction('RM is black', self, checkable = True)        
+        self.rmColorAction.triggered.connect( self.cb_rmColor)
+        self.rmColorAction.setStatusTip('Switch RM (resetMarker) between black and white')
+        self.rmColorAction.setChecked( self.rmColor == "black")
+        self.flagsMenu.addAction( self.rmColorAction)
         #
         # convTest
         #
@@ -469,25 +478,6 @@ class mandelBrotSetWidget( QMainWindow):
         #
         self.centerMenu = self.menuBar.addMenu('Center')
         self.addCenterItem( name = 'Center', cx = -0.75, cy = 0)
-        #
-        # Power
-        #
-        #self.powerMenu = self.menuBar.addMenu('Power')
-        #for i in range( 2, 11):
-        #    temp = "Power to %2d" % i
-        #    setattr( self, temp, QAction( temp, self))
-        #    getattr( self, temp).triggered.connect( self.mkPowerCb( i))
-        #    self.powerMenu.addAction( getattr( self, temp))
-        #
-        # Test
-        #
-        #self.testMenu = self.menuBar.addMenu('&Test')
-        #
-        # testColor
-        #
-        #self.testColorAction = QAction('Test color', self)        
-        #self.testColorAction.triggered.connect( self.cb_testColor)
-        #self.testMenu.addAction( self.testColorAction)
         #
         # help
         #
@@ -570,17 +560,10 @@ class mandelBrotSetWidget( QMainWindow):
         storeNamed.clicked.connect( self.cb_storeNamed)       
         self.statusBar.addWidget( storeNamed)
         #
-        # redo
-        #
-        #redo = QPushButton("Redo")
-        #redo.setToolTip( "Re-calc and re-show the plot.")
-        #redo.clicked.connect( self.cb_redo)       
-        #self.statusBar.addPermanentWidget( redo)
-        #
         # stop
         #
         stop = QPushButton("&Stop")
-        stop.setToolTip( "Stop the Julia scan")
+        stop.setToolTip( "Stop the Julia scan and animations")
         stop.clicked.connect( self.cb_stop)       
         self.statusBar.addPermanentWidget( stop)
         #
@@ -616,7 +599,7 @@ class mandelBrotSetWidget( QMainWindow):
         #
         # color maps
         #
-        self.cmapLbl = QLabel( "Color Map: %s" % self.colorMapName)
+        self.cmapLbl = QLabel( "CMAP: %s" % self.colorMapName)
         #self.cmapLbl.setFixedWidth( 180)
         self.cmapLbl.setToolTip( "Open 'Colors' or 'AllColors' to select color maps.")
         hLayout = QHBoxLayout()
@@ -632,22 +615,11 @@ class mandelBrotSetWidget( QMainWindow):
         #
         # cyclic
         #
-        self.cyclicCb = QCheckBox( "Cyclic CMAP", self)
+        self.cyclicCb = QCheckBox( "Cyclic", self)
         self.cyclicCb.setToolTip( "If enabled, the color map is made cyclic, like prism or flag.")
         self.cyclicCb.setChecked( self.flagCyclic == "True")
         self.cyclicCb.clicked.connect( self.cb_cyclic)
         hLayout.addWidget( self.cyclicCb)
-        #
-        # cyclic colors, set to 128, no choice
-        #
-        #self.nColorCyclicCombo = QComboBox()
-        #self.nColorCyclicCombo.setToolTip( "Resolution of the cyclic color map.")
-        #for elm in NCOLORCYCLIC_VALUES:
-        #    self.nColorCyclicCombo.addItem( str( elm))
-        #self.nColorCyclicCombo.setCurrentIndex( 0)
-        #self.nColorCyclicCombo.activated.connect( self.cb_nColorCyclicCombo )
-        #hLayout.addWidget( self.nColorCyclicCombo)
-        #hLayout.addStretch()
 
         row += 1
         col = 0
@@ -750,7 +722,7 @@ class mandelBrotSetWidget( QMainWindow):
         #
         self.animatePb = QPushButton("Exec")
         self.animatePb.setToolTip( "Execute animation")
-        self.animatePb.clicked.connect( self.cb_animate)
+        self.animatePb.clicked.connect( self.cb_animateZoom)
         hLayout.addStretch()
         hLayout.addWidget( self.animatePb)
         col = 1
@@ -802,9 +774,9 @@ class mandelBrotSetWidget( QMainWindow):
             self.widthCombo.addItem( str( elm))
         self.widthCombo.setCurrentIndex( 0)
         self.widthCombo.activated.connect( self.cb_widthCombo )
-        hLayout.addStretch()
         hLayout.addWidget( QLabel( 'Width'))
         hLayout.addWidget( self.widthCombo)
+        hLayout.addStretch()
         col = 1
         self.gridLayout.addLayout( hLayout, row, col)
         hLayout = QHBoxLayout()
@@ -942,9 +914,9 @@ class mandelBrotSetWidget( QMainWindow):
         self.interpolationModeCombo.setCurrentIndex( 0)
         self.interpolationModeCombo.activated.connect( self.cb_interpolationModeCombo )
         hLayout = QHBoxLayout()
-        hLayout.addStretch()
         hLayout.addWidget( QLabel( 'Interpolation'))
         hLayout.addWidget( self.interpolationModeCombo)
+        hLayout.addStretch()
         col = 1
         self.gridLayout.addLayout( hLayout, row, col)
         #
@@ -1089,7 +1061,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.mandelbrotModeCombo.addItem( str( elm))
         self.mandelbrotModeCombo.setCurrentIndex( 3)
         self.mandelbrotModeCombo.activated.connect( self.cb_mandelbrotModeCombo )
-        hLayout.addWidget( QLabel( 'Mandelbrot Mode'))
+        hLayout.addWidget( QLabel( 'Mandelbrot'))
         hLayout.addWidget( self.mandelbrotModeCombo)
         #
         # M3D
@@ -1111,9 +1083,9 @@ class mandelBrotSetWidget( QMainWindow):
             self.juliaModeCombo.addItem( str( elm))
         self.juliaModeCombo.setCurrentIndex( 0)
         self.juliaModeCombo.activated.connect( self.cb_juliaModeCombo )
-        hLayout.addStretch()
-        hLayout.addWidget( QLabel( 'Julia Mode'))
+        hLayout.addWidget( QLabel( 'Julia'))
         hLayout.addWidget( self.juliaModeCombo)
+        hLayout.addStretch()
         col = 1
         self.gridLayout.addLayout( hLayout, row, col)
         hLayout = QHBoxLayout()
@@ -1161,6 +1133,10 @@ class mandelBrotSetWidget( QMainWindow):
         temp.setToolTip( "Zoom back to whole fractal")
         temp.clicked.connect( self.cb_zoomHome)
         hLayout.addWidget( temp)
+        row += 1
+        col = 0
+        self.gridLayout.addLayout( hLayout, row, col)
+        hLayout = QHBoxLayout()
         #
         # goto lastRead
         #
@@ -1172,17 +1148,10 @@ class mandelBrotSetWidget( QMainWindow):
         # lastRead file name
         #
         self.lastReadLbl = QLabel("n.n.")
+        #self.lastReadLbl.setFixedWidth( 100)
         hLayout.addWidget( self.lastReadLbl)
-        #
-        # clearRM (resetMarker)
-        #
-        temp = QPushButton("ClearRM")
-        temp.setToolTip( "Clear reset marker")
-        temp.clicked.connect( self.cb_clearRM)
-        hLayout.addWidget( temp)
         hLayout.addStretch()
-        row += 1
-        col = 0
+        col = 1
         self.gridLayout.addLayout( hLayout, row, col, 1, 3)
         hLayout = QHBoxLayout()
         #
@@ -1197,25 +1166,29 @@ class mandelBrotSetWidget( QMainWindow):
         self.gridLayout.addWidget( self.logWidget, row, col, 1, 3)
         hLayout = QHBoxLayout()
         #
-        # cx, cy, delta
+        # delta
         #
         self.deltaLbl = QLabel( "Delta")
         hLayout.addWidget( self.deltaLbl)
         hLayout.addStretch()
+        row += 1
+        col = 0
+        self.gridLayout.addLayout( hLayout, row, col)
+        hLayout = QHBoxLayout()
         #
         # x, y, data
         #
         #
         # ShowData
         #
-        self.showDataCb = QCheckBox( "Show Data", self)
-        self.showDataCb.setToolTip( "Run ShowData code")
-        self.showDataCb.setChecked( self.showData == "True") 
-        self.showDataCb.clicked.connect( self.cb_showData)
-        hLayout.addWidget( self.showDataCb)
-        self.dataLbl = QLabel( "Data")
-        hLayout.addWidget( self.dataLbl)
-        hLayout.addStretch()
+        #self.showDataCb = QCheckBox( "Show Data", self)
+        #self.showDataCb.setToolTip( "Run ShowData code")
+        #self.showDataCb.setChecked( self.showData == "True") 
+        #self.showDataCb.clicked.connect( self.cb_showData)
+        #hLayout.addWidget( self.showDataCb)
+        #self.dataLbl = QLabel( "Data")
+        #hLayout.addWidget( self.dataLbl)
+        #hLayout.addStretch()
         #
         # IterPath
         #
@@ -1224,9 +1197,16 @@ class mandelBrotSetWidget( QMainWindow):
         self.iterPathCb.setChecked( self.iterPath == "True") 
         self.iterPathCb.clicked.connect( self.cb_iterPath)
         hLayout.addWidget( self.iterPathCb)
-        row += 1
-        col = 0
-        self.gridLayout.addLayout( hLayout, row, col, 1, 3)
+        #
+        # clearRM (resetMarker)
+        #
+        temp = QPushButton("ClearRM")
+        temp.setToolTip( "Clear reset marker")
+        temp.clicked.connect( self.cb_clearRM)
+        hLayout.addWidget( temp)
+
+        col = 1
+        self.gridLayout.addLayout( hLayout, row, col)
         return
 
     def on_key_press(self, event):
@@ -1323,7 +1303,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.resetMarker.set( x = self.centerHsh[ name][ 'cx'], 
                                   y = self.centerHsh[ name][ 'cy'], 
                                   text = r'+', 
-                                  color=RESET_MARKER_COLOR)
+                                  color=self.rmColor)
             self.lastFileRead = self.centerHsh[ name][ 'fName'] 
             temp = self.trimCenterName( self.lastFileRead)
             self.lastReadLbl.setText( temp)
@@ -1362,37 +1342,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.centerMenu.addAction( getattr( self, temp))
         return 
     
-    #def cb_redo( self):
-    #    """
-    #    debugging feature
-    #    """
-    #    self.calcMandelbrotSet()
-    #    self.calcJuliaSet()
-    #    self.showMandelbrotSet()
-    #    self.showJuliaSet()
-    #    return
-    
-    def cb_places( self): 
-        # 
-        self.placesWidget = mandelbrotPlaces.places( self.app, parent = self)
-        self.placesWidget.show()
-        return 
-
-    def cb_store( self): 
-        # 
-        self.cb_pngM()
-        return 
-
-    def cb_storeNamed( self): 
-        #
-        dlg = utils.InputDialog( "Enter file name")
-        if dlg.exec_() == QDialog.Accepted:
-            value = dlg.get_value()
-            if value is None or len( value.strip()) == 0:
-                self.logWidget.append( "storeNamed: no input, return")
-                return 
-        self.cb_pngM( fileName = value)
-        return 
 
     def setColor( self, colorMapName, rotateColorMapIndex, band):
         """
@@ -1404,11 +1353,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.band = band
         if self.cmapLbl is not None:
             self.cmapLbl.setText( "CMAP: %s" % self.colorMapName)
-        #    
-        #  get_cmap returns a matplotlib.colors.LinearSegmentedColormap   
-        #  Copilot: LinearSegmentedColormap → smooth, continuous, 
-        #    mathematically defined. Harder to rotate.
-        #
+
         colorMapName = self.colorMapName
         if self.flagReversed == "True":
             colorMapName += '_r'
@@ -1434,19 +1379,6 @@ class mandelBrotSetWidget( QMainWindow):
             #
             rot_temp = np.roll( temp, shift=(CMAP_MAX - 1), axis=0)  
             self.colorMap = matplotlib.colors.ListedColormap( rot_temp)
-        #
-        # reverse the first 1023 colors, nicer for rotate or not?
-        #
-        #reversable = rot_temp[:-1]      # first 1023 colors
-        #fixed = rot_temp[-1:]           # last color (black)
-        #reversed_colors = reversable[::-1]          # reverse order
-        #new_colors = np.vstack((reversed_colors, fixed))
-        #
-        # Create a matplotlib.colors.ListedColormap
-        # Copilot: ListedColormap - discrete, easy to manipulate (rotate, shuffle, reorder). 
-        #   Perfect for animations or artistic tweaks.
-        #
-        #self.colorMap = matplotlib.colors.ListedColormap( rot_temp)
         #
         # the rotate slider need a ListedColormap
         #
@@ -1475,24 +1407,6 @@ class mandelBrotSetWidget( QMainWindow):
             return 
         return f
 
-    """
-    def mkPowerCb( self, i):
-        def f():
-            self.power = i
-
-            self.textTitleM.set( text = r'$z_{n+1} = z_n^%d + c, z_0 = 0$' % self.power)
-
-            if self.textTitleJ is not None: 
-                self.textTitleJ.set( text = r'$z_{n+1} = z_n^%d + c, z_0 = c$' % self.power)
-            
-            self.calcMandelbrotSet()
-            self.showMandelbrotSet()
-            self.calcJuliaSet()
-            self.showJuliaSet()
-            return 
-        return f
-    """
-    
     def findCurrentIndex( self, x, X):
         '''
         return the position as index of x in X
@@ -1618,7 +1532,7 @@ class mandelBrotSetWidget( QMainWindow):
 
         self.debugSpeedAction.setChecked( self.debugSpeed == "True")
         
-        self.showDataCb.setChecked( self.showData == "True")
+        #self.showDataCb.setChecked( self.showData == "True")
         
         return
     
@@ -1713,6 +1627,10 @@ class mandelBrotSetWidget( QMainWindow):
 
         return
 
+    #
+    #  === callbacks
+    #
+
     def cb_pngM( self, fileName = None):
         self.createImageMFile( 'png', fileName = fileName)
         return
@@ -1741,40 +1659,31 @@ class mandelBrotSetWidget( QMainWindow):
 
         return
 
-    #
-    #  === callbacks
-    #
-
-    def cb_P1( self): 
-        self.maxIterM = 128
-        for i in range( 10): 
-            self.cxM = -0.9 + 0.1*i
-            self.cyM = 0.25
-            self.calcJuliaSet()
-            self.showJuliaSet()
-            plt.figure(1) 
+    def cb_places( self): 
+        # 
+        self.placesWidget = mandelbrotPlaces.places( self.app, parent = self)
+        self.placesWidget.show()
         return 
 
-    def cb_testColor( self):
-        #
-        # fill a 2D array with some numbers and see how the color is handled
-        #
-        dim = 512
-        a = np.empty([dim, dim], dtype = float)
-        for i in range( dim):
-            for j in range( dim):
-                a[i][j] = float( j)/1000.
+    def cb_store( self): 
+        # 
+        self.cb_pngM()
+        return 
 
-        self.dataMandelbrotSet = a
-        self.showMandelbrotSet()
-                
+    def cb_storeNamed( self): 
+        #
+        dlg = utils.InputDialog( "Enter file name")
+        if dlg.exec_() == QDialog.Accepted:
+            value = dlg.get_value()
+            if value is None or len( value.strip()) == 0:
+                self.logWidget.append( "storeNamed: no input, return")
+                return 
+        self.cb_pngM( fileName = value)
         return 
 
     def rotateColorMapFunc( self, shiftIndex):
         #
-        # matplotlib.colors.ListedColormap has '.colors'
-        #
-        # rotate only the first 1023 colors, leaving black the last one in place
+        # rotate only the first 1023 colors, leaving black, the last one, in place
         #
         rotatable = self.colorMap.colors[:-1]
         fixed = self.colorMap.colors[-1:]
@@ -1789,6 +1698,7 @@ class mandelBrotSetWidget( QMainWindow):
         called from:
           - callback to slider movements
           - from mandelbrotPlaces
+          - implicitly from self.cmapRotateSlider.setValue()
         """
         if self.busy:
             return
@@ -1796,10 +1706,8 @@ class mandelBrotSetWidget( QMainWindow):
         self.busy = True
         shiftIndex = colorIndex - self.rotateColorMapIndex
         self.rotateColorMapIndex = colorIndex
-        #self.cmapRotateSlider.setValue( colorIndex)
         self.cmapRotateSliderLbl.setText( "C-Index: %-4d" % colorIndex)
         self.rotateColorMapFunc( shiftIndex)
-        self.app.processEvents()
         self.showMandelbrotSet()
         self.showJuliaSet()
         self.app.processEvents()
@@ -1811,12 +1719,52 @@ class mandelBrotSetWidget( QMainWindow):
         return
 
     def cb_geometry( self):
+
+        self.logWidget.append( "Width %d px, Height %d px" %
+                               ( self.screen.size().width(), self.screen.size().height()))
+        self.logWidget.append( "Width %g in, Height %g in" %
+                               ( self.screenWidthIn, self.screenHeightIn))
+        self.logWidget.append( "figSizeMInch %s, dpi %d" %
+                               ( repr( self.figSizeM), self.dpi))
+
         self.logWidget.append( "cb_geometry: self.geometry(): %s" % repr( self.geometry()))
         self.logWidget.append( "cb_geometry: figM %s " % self.mgrM.window.geometry())
-        if self.debugColoring:
+        if self.debugColoring == "True":
             self.logWidget.append( "cb_geometry: figDebugColoring %s " %
                                    self.figDebugColoring.canvas.manager.window.geometry())
         return
+    
+    def rotateColorsContinuously( self):
+        self.isRotating = True
+        self.colorRotateExecPb.setStyleSheet("background-color:lightblue")
+        colorIndexOld = self.rotateColorMapIndex
+        self.logWidget.append( "rotate: started rotating at %d" % 
+                               ( colorIndexOld))
+        self.app.processEvents()
+        self.calcMandelbrotSet( display = False)
+
+        while True:
+            time.sleep( self.rotateWaitTime)
+            #
+            # avoid that color rotation blocks
+            #
+            self.app.processEvents()
+            colorIndex = self.rotateColorMapIndex + self.colorRotateValue
+            if colorIndex >= CMAP_MAX:
+                colorIndex = 0
+            if colorIndex < 0:
+                colorIndex = CMAP_MAX - 1
+            self.cmapRotateSlider.setValue( colorIndex)
+            if self.stopRequested:
+                self.stopRequested = False
+                self.colorRotateExecPb.setStyleSheet("background-color:%s" % self.progressLblBg)
+                self.logWidget.append( "rotate: stopped at %d" % self.rotateColorMapIndex) 
+                break
+
+        self.isRotating = False
+        self.showMandelbrotSet()
+                
+        return 
 
     def cb_colorRotateExecPb( self):
         if self.isRotating: 
@@ -1837,48 +1785,8 @@ class mandelBrotSetWidget( QMainWindow):
         self.rotateWaitTime = float( ROTATEWAITTIME_VALUES[ i])
         
         return
-    
-    def rotateColorsContinuously( self):
-        # +++                   
-        self.isRotating = True
-        self.colorRotateExecPb.setStyleSheet("background-color:lightblue")
-        colorIndexOld = self.rotateColorMapIndex
-        self.logWidget.append( "rotate: started rotating at %d" % 
-                               ( colorIndexOld))
-        self.app.processEvents()
-        self.calcMandelbrotSet( display = False)
 
-        while True:
-            time.sleep( self.rotateWaitTime)
-            colorIndex = self.rotateColorMapIndex + self.colorRotateValue
-            if colorIndex >= CMAP_MAX:
-                colorIndex = 0
-            if colorIndex < 0:
-                colorIndex = CMAP_MAX - 1
-            self.cmapRotateSlider.setValue( colorIndex)
-            if self.stopRequested:
-                self.stopRequested = False
-                self.colorRotateExecPb.setStyleSheet("background-color:%s" % self.progressLblBg)
-                self.logWidget.append( "rotate: stopped at %d" % self.rotateColorMapIndex) 
-                break
-        """
-        if step > 0:
-            temp = colorIndexOld - self.rotateColorMapIndex
-        else: 
-            temp = colorIndexOld - self.rotateColorMapIndex + 1
-
-        self.rotateColorMapFunc( temp)
-        self.rotateColorMapIndex = colorIndexOld
-        self.cmapRotateSlider.setValue( self.rotateColorMapIndex)
-        self.cmapRotateSliderLbl.setText( "C-Index: %-4d" % self.rotateColorMapIndex)
-        """
-
-        self.isRotating = False
-        self.showMandelbrotSet()
-                
-        return 
-
-    def cb_animate( self):
+    def cb_animateZoom( self):
         #
             
         if self.deltaM > 2.9:
@@ -1969,7 +1877,7 @@ class mandelBrotSetWidget( QMainWindow):
                 self.widthM = newWidth
                 self.setCurrentIndices()
             else: 
-                self.logWidget.append( "cb_animate: cannot use 50% of width, not in VALUES")
+                self.logWidget.append( "cb_animateZoom: cannot use 50% of width, not in VALUES")
 
         colorIndexOld = self.rotateColorMapIndex
         for i in range( len( cx)):
@@ -2327,6 +2235,16 @@ class mandelBrotSetWidget( QMainWindow):
         self.showJuliaSet()
         return 
 
+    def cb_rmColor( self, i):
+        if i:
+            self.rmColor = 'black'
+        else:
+            self.rmColor = 'white'
+        self.resetMarker.set( color=self.rmColor) 
+        self.showMandelbrotSet()
+        self.showJuliaSet()
+        return 
+
     def cb_showData( self, i):
         if i:
             self.showData = "True" 
@@ -2561,6 +2479,7 @@ class mandelBrotSetWidget( QMainWindow):
 
     def setDefaults( self):
 
+        self.rmColor = 'white'
         self.flagReversed = "False"
         self.flagCyclic = "False"
         self.nColorCyclic = NCOLORCYCLIC_VALUES[0]
@@ -2628,11 +2547,6 @@ class mandelBrotSetWidget( QMainWindow):
             self.juliaMode = JULIA_MODE_VALUES[ 0]
         self.clearScanPars()
             
-        #if self.figJ is not None: 
-        #    plt.close( self.figJ)
-        #    self.figJ = None
-        #    self.imJ.remove()
-        #    self.imJ = None
         self.debugSpiral = "False"
         if self.figDebugSpiral is not None: 
             plt.close( self.figDebugSpiral)
@@ -2668,12 +2582,12 @@ class mandelBrotSetWidget( QMainWindow):
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
                                   text = r'+', 
-                                  color=RESET_MARKER_COLOR) 
+                                  color=self.rmColor) 
         else: 
             self.resetMarker.set( x = self.cxM, 
                                   y = self.cyM, 
                                   text = r'', 
-                                  color=RESET_MARKER_COLOR)
+                                  color=self.rmColor)
         return 
 
     def cb_reset( self):
@@ -4136,7 +4050,7 @@ above mentioned formula, except that z(0) is set to c.\
             "<li> IterPath: Display the iterated sequence of z(n)</li>"
             "<li> Delta: Width of the current image </li>"
             "<li> ShowData: If enabled, shows, x, y, data </li>"
-            "<ul>"
+            "</ul>"
                 ))
         
         

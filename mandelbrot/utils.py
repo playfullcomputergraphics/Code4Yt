@@ -14,7 +14,7 @@ CMAPS = [ 'hot', 'viridis',
 
 CMAPS_CYCLIC = [ 'flag', 'prism', 'jet', 'turbo', 
                  'gist_rainbow', 'hsv', 'twilight', 'Paired', 
-                 'Set1', 
+                 'Set1', 'tab10',  
                 ]
 CMAPS_DCT = { 
     'Uniform': ['viridis', 'plasma', 'inferno', 'magma', 'cividis'],
