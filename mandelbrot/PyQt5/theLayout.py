@@ -227,20 +227,11 @@ class basicStructure( QMainWindow):
     def cb_helpWidget(self):
         QMessageBox.about(self, self.tr("Help Widget"), self.tr(
             "<h3> Help Widget</h3>"
-            "This widget demonstrates the basic structure of a PyQt5 application including"
+            "This widget demonstrates the layout concept used in my PyQt5 applications"
             "<ul>"
-            "<li> Menubar with File and Help </li>"
-            "<ul>"
-            "<li> File </li>"
-            "<li> Help </li>"
-            "</ul>"
-            "<li> Central part with </li>"
-            "<ul>"
-            "<li> grid layout</li>"
-            "<li> label widget</li>"
-            "<li> log widget</li>"
-            "</ul>"
-            "<li> Statusbar with Quit, shortcut Alt-q</li>"
+            "<li> The overall structure is a QGridLayout </li>"
+            "<li> QHBoxLayout widgets are used to collect widgets to be inserted in a cell </li>"
+            "<li> Horizontal lines are useful to separate groups of widgets </li>"
             "</ul>"
                 ))
 

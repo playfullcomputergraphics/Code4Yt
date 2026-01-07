@@ -233,22 +233,8 @@ class smartCallbacks( QMainWindow):
     #
     def cb_helpWidget(self):
         QMessageBox.about(self, self.tr("Help Widget"), self.tr(
-            "<h3> Help Widget</h3>"
-            "This widget demonstrates the basic structure of a PyQt5 application including"
-            "<ul>"
-            "<li> Menubar with File and Help </li>"
-            "<ul>"
-            "<li> File </li>"
-            "<li> Help </li>"
-            "</ul>"
-            "<li> Central part with </li>"
-            "<ul>"
-            "<li> grid layout</li>"
-            "<li> label widget</li>"
-            "<li> log widget</li>"
-            "</ul>"
-            "<li> Statusbar with Quit, shortcut Alt-q</li>"
-            "</ul>"
+            "<h3> Help Smart Callbacks</h3>"
+            "This widget demonstrates the use of smart callbacks in PyQt5 applications"
                 ))
 
     def cb_close( self):
