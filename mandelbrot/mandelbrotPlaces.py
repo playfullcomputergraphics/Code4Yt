@@ -43,13 +43,14 @@ class places( QMainWindow):
         self.geoWidth = geoScreen.size().width()
         self.geoHeight = geoScreen.size().height()
 
+        """
         font = QFont( 'Sans Serif')
         if self.geoWidth <= 1920:
             font.setPixelSize( 16)
         else:
             font.setPixelSize( 22)
         self.app.setFont( font)
-
+        """
         self.w = None
         self.gridLayout = None
         self.scrollArea = None
@@ -58,11 +59,9 @@ class places( QMainWindow):
         if len( screens) > 1:
             #self.setFixedSize( 562, 664)
             self.setGeometry( screens[1].geometry().x() + 870,
-                              screens[1].geometry().y() + 10, 500, 500)
-            self.show() # placing show() before the next statement is important!
-            self.app.processEvents()
-        #self.parent.logWidget.append( "places: self.geometry() %s" %
-        #                       ( repr( self.geometry())))
+                              screens[1].geometry().y() + 10, 1000, 500)
+        self.show() # placing show() before the next statement is important!
+        self.app.processEvents()
         
         self.prepareMenuBar()
         self.prepareCentralPart()
@@ -139,10 +138,11 @@ class places( QMainWindow):
         self.thumbnails = glob.glob( "./places/MB_*.png")
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
-        ncol = int( math.sqrt( len( self.thumbnails)))
-        if ncol < 5: 
-            ncol = 5
+        #ncol = int( math.sqrt( len( self.thumbnails)))
+        ncol = 5
+
         iOff = 0
+        self.setStyleSheet("QLabel { font-size: 10pt; }")
         for i, path in enumerate( self.thumbnails):
             thumb = ClickableThumbnail( path)
             thumb.setPixmap(QPixmap(thumb.image_path).scaled(150, 150))
@@ -151,7 +151,8 @@ class places( QMainWindow):
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
             vLayout = QVBoxLayout()
             vLayout.addWidget( thumb)
-            vLayout.addWidget( QLabel( path.split('/')[-1]))
+            temp = QLabel( path.split('/')[-1])
+            vLayout.addWidget( temp)
             
             row = (i // ncol)
             col = i % ncol
@@ -175,7 +176,7 @@ class places( QMainWindow):
         self.thumbnails.reverse()
         for i, path in enumerate( self.thumbnails):
             thumb = ClickableThumbnail( path)
-            thumb.setPixmap(QPixmap(thumb.image_path).scaled(150, 150))
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled( 150, 150))
             thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
             thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))

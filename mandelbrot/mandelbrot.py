@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#
+# 1.2.2026
 import os, sys, time, math, random, json, hashlib
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -25,6 +25,7 @@ except:
 
 import mandelbrotTiled
 import mandelbrotPlaces
+import threading
 
 import numpy as np
 import numexpr as ne
@@ -115,22 +116,23 @@ MBS_Attrs = METADATA_MEMBERS + \
       'textTitleM', 'mgrJ', 'juliaKeyclick', 'textTitleJ',
       'placesWidget', 'cxOld', 'cyOld', 'deltaOld', 'nColorCyclic', 'nColorCyclicCombo', 
       'animateAtConstantWidth', 'animateAtConstantWidthAction',  
-      'convTest', 'iConvTest', 'figM3D', 'animatePb', 'debugSpiral', 'debugColoring',  
+      'figM3D', 'animatePb', 'debugSpiral', 'debugColoring',  
       'shaderAction', 'scansAction', 'placesAction', 'overviewAction', 'coloringAction',
-      'smoothModeCombo', 'cython', 'highPrec', 'smoothAction', 'miscAction', 
+      'smoothModeCombo', 'cython', 'highPrec', 'highPrecAction', 'smoothAction', 'miscAction', 
       'figSize3D', 'flagM3D', 'surface', 'fig3D','fig3D', 'clipCb', 'smoothModeCombo', 
-      'surface', 'm3DCb', 'resetMarker', 'fontSize', 'numba', 'numbaCb',
+      'surface', 'm3DCb', 'resetMarker', 'fontSize', 'numba', 'numbaAction',
       'dataMandelbrotSet3D', 'colorsMenu', 'allColorsMenu', 'cmapLbl',
       'deltaLbl', 'mandelbrotMode', 'mandelbrotModeCombo', 'rotateWaitTimeCombo', 
       'juliaMode', 'juliaModeCombo', 'isAnimating', 'spiralCombo', 
       'bandCb', 'dataLbl', 'normCombo', 'normFunc', 'scanPath', 'scanTexts',
-      'redoAction', 'ax3D', 'axDebugSpiral', 'axDebugColoring',  
+      'repeatAction', 'ax3D', 'axDebugSpiral', 'axDebugColoring',  
       'axM', 'axJulia', 'iterPath', 'flagIterPath', 'iterPathCb', 'colorRotateExecPb', 
       'vmaxSlider', 'vmaxSliderLbl', 'vminSlider', 'vminSliderLbl', 'tiled',
-      'flagsMenu', 'cythonAction', 'tiledAction', 'convTestAction', 'debugSpiralAction', 
-      'debugColoringAction', 'debugSpeed', 'debugSpeedAction',
-      'centerHsh', 'centerMenu', 'resetMarkerAction', 
-      'lastReadLbl', 'rmColor', 'rmColorAction', 
+      'flagsMenu', 'cythonAction', 'tiledAction', 'debugSpiralAction', 
+      'debugColoringAction', 'debugSpeed', 'debugSpeedAction', 'numpyAction', 'numpy', 
+      'centerHsh', 'centerMenu', 'resetMarkerAction', 'scalarAction', 'scalar', 
+      'lastReadLbl', 'rmColor', 'rmColorAction', 'animateMaxIterAction',
+      'numpyOnlyAction', 'numpyOnly', 'cardioidBulbAction', 'cardioidBulb', 'prangeAction', 'prange', 
      ]
 
 class mandelBrotSetWidget( QMainWindow):
@@ -277,6 +279,12 @@ class mandelBrotSetWidget( QMainWindow):
         self.cbar = None
         self.juliaMode = None
         self.cythonAction = None
+        self.numpyAction = None
+        self.numpyOnlyAction = None  # no NumExpr
+        self.cardioidBulbAction = None     # Enable Cardioid/Bulb detection
+        self.prangeAction = None     # Enable prange()
+        self.scalarAction = None
+        self.debugSpeedAction = None
         self.lastFileRead = None
         self.centerHsh = {}
         return 
@@ -332,11 +340,23 @@ class mandelBrotSetWidget( QMainWindow):
         self.geometryAction.triggered.connect( self.cb_geometry)
         self.fileMenu.addAction( self.geometryAction)
         #
+        # exec iterMaxAnimation
+        #
+        self.animateMaxIterAction = QAction("AnimateMaxIter")
+        self.animateMaxIterAction.triggered.connect( self.cb_animateMaxIter)
+        self.fileMenu.addAction( self.animateMaxIterAction)
+        #
         # clear log widget
         #
         self.clearAction = QAction('Clear log widget', self)        
         self.clearAction.triggered.connect( self.cb_clear)
         self.fileMenu.addAction( self.clearAction)
+        #
+        # repeat
+        #
+        self.repeatAction = QAction('Repeat last calculation', self)        
+        self.repeatAction.triggered.connect( self.cb_repeat)
+        self.fileMenu.addAction( self.repeatAction)
         #
         # png test
         #
@@ -394,7 +414,7 @@ class mandelBrotSetWidget( QMainWindow):
         # cython
         #
         if cythonOK:
-            self.cythonAction = QAction('CYTHON', self, checkable = True)        
+            self.cythonAction = QAction('Cython/C', self, checkable = True)        
             self.cythonAction.triggered.connect( self.cb_cython)
             self.cythonAction.setStatusTip('Enable cython code')
             self.cythonAction.setChecked( self.cython == "True")
@@ -403,11 +423,64 @@ class mandelBrotSetWidget( QMainWindow):
         # tiled
         #
         if cythonOK:
-            self.tiledAction = QAction('TILED', self, checkable = True)        
+            self.tiledAction = QAction('Cython/C-tiled', self, checkable = True)
             self.tiledAction.triggered.connect( self.cb_tiled)
-            self.tiledAction.setStatusTip('Enable multithreading')
+            self.tiledAction.setStatusTip('Multithreaded')
             self.tiledAction.setChecked( self.tiled == "True")
             self.flagsMenu.addAction( self.tiledAction)
+        #
+        # Numpy/Numexpr
+        #
+        self.numpyAction = QAction('Numpy/NumExpr', self, checkable = True)        
+        self.numpyAction.triggered.connect( self.cb_numpy)
+        self.numpyAction.setStatusTip('Enable numpy/numexpr code')
+        self.numpyAction.setChecked( self.numpy == "True")
+        self.flagsMenu.addAction( self.numpyAction)
+        #
+        # Numba
+        #
+        if numbaOK:
+            self.numbaAction = QAction('Numba/Cuda', self, checkable = True)        
+            self.numbaAction.triggered.connect( self.cb_numba)
+            self.numbaAction.setStatusTip('Enable multithreading')
+            self.numbaAction.setChecked( self.numba == "True")
+            self.flagsMenu.addAction( self.numbaAction)
+        #
+        # scalar
+        #
+        self.scalarAction = QAction('Scalar', self, checkable = True)        
+        self.scalarAction.triggered.connect( self.cb_scalar)
+        self.scalarAction.setStatusTip('Enable scalar algorithm, very slow')
+        self.scalarAction.setChecked( self.scalar == "True")
+        self.flagsMenu.addAction( self.scalarAction)
+        #
+        self.flagsMenu.addSeparator()
+        #
+        # numpyOnly
+        #
+        self.numpyOnlyAction = QAction('NumpyOnly', self, checkable = True)        
+        self.numpyOnlyAction.triggered.connect( self.cb_numpyOnly)
+        self.numpyOnlyAction.setStatusTip('Pure Numpy no NumExpr')
+        self.numpyOnlyAction.setChecked( self.numpyOnly == "True")
+        self.flagsMenu.addAction( self.numpyOnlyAction)
+        #
+        # cardioidBulb
+        #
+        self.cardioidBulbAction = QAction('Cardioid/Bulb', self, checkable = True)        
+        self.cardioidBulbAction.triggered.connect( self.cb_cardioidBulb)
+        self.cardioidBulbAction.setStatusTip('Cardioid/Bulb speedup feature')
+        self.cardioidBulbAction.setChecked( self.cardioidBulb == "True")
+        self.flagsMenu.addAction( self.cardioidBulbAction)
+        #
+        # prange
+        #
+        self.prangeAction = QAction('prange()', self, checkable = True)        
+        self.prangeAction.triggered.connect( self.cb_prange)
+        self.prangeAction.setStatusTip('prange() parallel-range()')
+        self.prangeAction.setChecked( self.prange == "True")
+        self.flagsMenu.addAction( self.prangeAction)
+        #
+        self.flagsMenu.addSeparator()
         #
         # ResetMarker black/white
         #
@@ -416,14 +489,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.rmColorAction.setStatusTip('Switch RM (resetMarker) between black and white')
         self.rmColorAction.setChecked( self.rmColor == "black")
         self.flagsMenu.addAction( self.rmColorAction)
-        #
-        # convTest
-        #
-        self.convTestAction = QAction('ConvTest', self, checkable = True) 
-        self.convTestAction.triggered.connect( self.cb_convTest)
-        self.convTestAction.setStatusTip( "Enable convergence test for animation speed-up. \nThis might introduce artefacts")
-        self.convTestAction.setChecked( self.convTest == "True")
-        self.flagsMenu.addAction( self.convTestAction)
         #
         # animateAtConstantWidth
         #
@@ -457,14 +522,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.debugSpeedAction.setChecked( self.debugSpeed == "True")
         self.flagsMenu.addAction( self.debugSpeedAction)
         #
-        # Numba
-        #
-        if numbaOK:
-            self.numbaAction = QAction('NUMBA', self, checkable = True)        
-            self.numbaAction.triggered.connect( self.cb_numba)
-            self.numbaAction.setStatusTip('Enable multithreading')
-            self.numbaAction.setChecked( self.numba == "True")
-            self.flagsMenu.addAction( self.numbaAction)
         #
         # HighPrec
         #
@@ -571,7 +628,7 @@ class mandelBrotSetWidget( QMainWindow):
         #
         reset = QPushButton("&Reset")
         reset.clicked.connect( self.cb_reset)       
-        reset.setToolTip( "Reset all variables and restart")
+        reset.setToolTip( "Reset all variables, set the reset marker and restart")
         self.statusBar.addPermanentWidget( reset)
         #
         # quit
@@ -1130,7 +1187,7 @@ class mandelBrotSetWidget( QMainWindow):
         # zoomhome
         #
         temp = QPushButton("ZoomHome")
-        temp.setToolTip( "Zoom back to whole fractal")
+        temp.setToolTip( "Zoom back to whole fractal, leaving the reset marker")
         temp.clicked.connect( self.cb_zoomHome)
         hLayout.addWidget( temp)
         row += 1
@@ -1197,6 +1254,14 @@ class mandelBrotSetWidget( QMainWindow):
         self.iterPathCb.setChecked( self.iterPath == "True") 
         self.iterPathCb.clicked.connect( self.cb_iterPath)
         hLayout.addWidget( self.iterPathCb)
+        hLayout.addStretch()
+        #
+        # setRM (resetMarker)
+        #
+        temp = QPushButton("SetRM")
+        temp.setToolTip( "Set reset marker")
+        temp.clicked.connect( self.cb_setRM)
+        hLayout.addWidget( temp)
         #
         # clearRM (resetMarker)
         #
@@ -1207,6 +1272,11 @@ class mandelBrotSetWidget( QMainWindow):
 
         col = 1
         self.gridLayout.addLayout( hLayout, row, col)
+
+        if not cythonOK:
+            self.logWidget.append( "The cython interface does not exist")
+            self.logWidget.append( "Consider to create one to speed-up")
+
         return
 
     def on_key_press(self, event):
@@ -1522,8 +1592,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.animationFactorCombo.setCurrentIndex( 
             self.findCurrentIndex( self.animationFactor, ANIMATIONFACTOR_VALUES))
 
-        self.convTestAction.setChecked( self.convTest == "True")
-
         self.animateAtConstantWidthAction.setChecked( self.animateAtConstantWidth == "True")
 
         self.debugSpiralAction.setChecked( self.debugSpiral == "True")
@@ -1694,7 +1762,6 @@ class mandelBrotSetWidget( QMainWindow):
     
     def cb_cmapRotateSlider( self, colorIndex):
         """
-        +++
         called from:
           - callback to slider movements
           - from mandelbrotPlaces
@@ -1718,6 +1785,13 @@ class mandelBrotSetWidget( QMainWindow):
         self.logWidget.clear()
         return
 
+    def cb_repeat( self):
+        self.calcMandelbrotSet()
+        self.calcJuliaSet()
+        self.showMandelbrotSet()
+        self.showJuliaSet()
+        return
+
     def cb_geometry( self):
 
         self.logWidget.append( "Width %d px, Height %d px" %
@@ -1727,11 +1801,13 @@ class mandelBrotSetWidget( QMainWindow):
         self.logWidget.append( "figSizeMInch %s, dpi %d" %
                                ( repr( self.figSizeM), self.dpi))
 
-        self.logWidget.append( "cb_geometry: self.geometry(): %s" % repr( self.geometry()))
-        self.logWidget.append( "cb_geometry: figM %s " % self.mgrM.window.geometry())
+        self.logWidget.append( "self.geometry(): %s" % repr( self.geometry()))
+        self.logWidget.append( "figM %s " % self.mgrM.window.geometry())
         if self.debugColoring == "True":
             self.logWidget.append( "cb_geometry: figDebugColoring %s " %
                                    self.figDebugColoring.canvas.manager.window.geometry())
+        if self.placesWidget is not None: 
+            self.logWidget.append( "self.places.geometry(): %s" % repr( self.placesWidget.geometry()))
         return
     
     def rotateColorsContinuously( self):
@@ -1818,9 +1894,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.isAnimating = True
         self.animatePb.setStyleSheet("background-color:lightblue")
         
-        self.iConvTest = 1
-        if self.convTest.lower() == 'false':
-            self.iConvTest = 0
         startTime = time.time()
         
         frames = int( math.log( deltaEnd/deltaStart)/math.log( self.animationFactor))
@@ -1899,7 +1972,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.setCurrentIndices()
         self.logWidget.append( "animate: DONE, %g" % 
                                (( time.time() - startTime)))
-        self.iConvTest = 0
         self.animatePb.setStyleSheet("background-color:%s" % self.progressLblBg)
         self.vmin = vminEnd
         self.vmax = (1024. - vmaxDiff)
@@ -1913,6 +1985,38 @@ class mandelBrotSetWidget( QMainWindow):
         self.isAnimating = False
         return
 
+    def cb_animateMaxIter( self):
+        #
+        self.isAnimating = True
+        maxIterLow = self.maxIterM/8.
+        maxIterHigh = self.maxIterM
+        
+        arrUp = np.linspace( 0, 1, 50, dtype=np.float64)
+        temp = maxIterHigh - maxIterLow
+        arrUp = arrUp*temp + float( maxIterLow) 
+
+        arrDown = np.linspace( 0, -1, 50, dtype=np.float64)
+        arrDown = arrDown*temp + float( maxIterHigh) 
+
+        for elm in arrDown: 
+            self.maxIterM = elm
+            print( "Down %g" % elm) 
+            self.calcMandelbrotSet()
+            self.showMandelbrotSet()
+        for elm in arrUp: 
+            self.maxIterM = elm
+            print( "Up %g" % elm) 
+            self.calcMandelbrotSet()
+            self.showMandelbrotSet()
+            
+        self.maxIterM = maxIterHigh
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+            
+        self.isAnimating = False
+        self.app.processEvents()
+        return
+
     def cb_zoomOut( self):
         self.deltaM *= self.zoom
         if self.deltaM > 3.:
@@ -1924,7 +2028,7 @@ class mandelBrotSetWidget( QMainWindow):
         return
 
     def cb_zoomHome( self): 
-        self.setResetMarker()
+        #self.setResetMarker()
         self.cxM = -0.75
         self.cyM = 0.
         self.deltaM = 3.
@@ -2048,6 +2152,15 @@ class mandelBrotSetWidget( QMainWindow):
         self.showJuliaSet()
         return
         
+    def cb_setRM( self):
+        self.resetMarker.set( x = self.cxM, 
+                              y = self.cyM, 
+                              text = r'+', 
+                              color=self.rmColor) 
+        self.showMandelbrotSet()
+        self.showJuliaSet()
+        return
+        
     def cb_clearRM( self):
         self.resetMarker.set( text = r'') 
         self.showMandelbrotSet()
@@ -2137,7 +2250,52 @@ class mandelBrotSetWidget( QMainWindow):
             self.cython = "True" 
             self.numba = "False" 
             if numbaOK: 
-                self.numbaCb.setChecked( self.numba == "True") 
+                self.numbaAction.setChecked( self.numba == "True") 
+            self.scalar = "False" 
+            self.scalarAction.setChecked( self.scalar == "True") 
+            self.numpy = "False"
+            self.numpyAction.setChecked( self.numpy == "True") 
+        else:
+            self.cython = "False"
+            self.tiled = "False"
+            self.tiledAction.setChecked( self.tiled == "True") 
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        self.calcJuliaSet()
+        self.showJuliaSet()
+        return 
+
+    def cb_tiled( self, i):
+        if i:
+            self.tiled = "True"
+            self.cython = "True"
+            self.cythonAction.setChecked( self.cython == "True")
+            if numbaOK: 
+                self.numbaAction.setChecked( self.numba == "True") 
+            self.scalar = "False" 
+            self.scalarAction.setChecked( self.scalar == "True") 
+            self.numpy = "False"
+            self.numpyAction.setChecked( self.numpy == "True") 
+        else:
+            self.tiled = "False"
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        self.calcJuliaSet()
+        self.showJuliaSet()
+        return 
+
+    def cb_numpy( self, i):
+        if i:
+            self.numpy = "True"
+            self.cython = "False" 
+            self.cythonAction.setChecked( self.cython == "True") 
+            self.tiled = "False"
+            self.tiledAction.setChecked( self.tiled == "True") 
+            self.scalar = "False" 
+            self.scalarAction.setChecked( self.scalar == "True") 
+            self.numba = "False" 
+            if numbaOK: 
+                self.numbaAction.setChecked( self.numba == "True") 
         else:
             self.cython = "False"
             self.tiled = "False"
@@ -2158,10 +2316,58 @@ class mandelBrotSetWidget( QMainWindow):
                 self.tiledAction.setChecked( self.cython == "True")
         else:
             self.numba = "False"
+            self.cython = "True"
+            self.tiled = "True"
+            if cythonOK:
+                self.cythonAction.setChecked( self.cython == "True") 
+                self.tiledAction.setChecked( self.tiled == "True") 
         self.calcMandelbrotSet()
         self.showMandelbrotSet()
         self.calcJuliaSet()
         self.showJuliaSet()
+        return 
+
+    def cb_scalar( self, i):
+        if i:
+            self.numba = "False" 
+            if numbaOK:
+                self.numbaAction.setChecked( self.numba == "True")
+            self.scalar = "True" 
+            self.numpy = "False"
+            if cythonOK:
+                self.cython = "False"
+                self.tiled = "False"
+                self.cythonAction.setChecked( self.cython == "True")
+                self.tiledAction.setChecked( self.cython == "True")
+            else: 
+                self.numpy = "True"
+            self.numpyAction.setChecked( self.numpy == "True") 
+        else:
+            self.scalar = "False" 
+            self.numba = "False"
+        self.calcMandelbrotSet()
+        self.showMandelbrotSet()
+        return 
+
+    def cb_numpyOnly( self, i):
+        if i:
+            self.numpyOnly = "True" 
+        else:
+            self.numpyOnly = "False" 
+        return 
+
+    def cb_cardioidBulb( self, i):
+        if i:
+            self.cardioidBulb = "True" 
+        else:
+            self.cardioidBulb = "False" 
+        return 
+
+    def cb_prange( self, i):
+        if i:
+            self.prange = "True" 
+        else:
+            self.prange = "False" 
         return 
 
     def cb_highPrec( self, i):
@@ -2173,15 +2379,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.showMandelbrotSet()
         self.calcJuliaSet()
         self.showJuliaSet()
-        return 
-
-    def cb_convTest( self, i):
-        if i:
-            self.convTest = "True" 
-            self.iConvTest = 1
-        else:
-            self.convTest = "False" 
-            self.iConvTest = 0
         return 
 
     def cb_animateAtConstantWidth( self, i):
@@ -2222,17 +2419,6 @@ class mandelBrotSetWidget( QMainWindow):
         else:
             self.debugSpeed = "False"
 
-        return 
-
-    def cb_tiled( self, i):
-        if i:
-            self.tiled = "True" 
-        else:
-            self.tiled = "False"
-        self.calcMandelbrotSet()
-        self.showMandelbrotSet()
-        self.calcJuliaSet()
-        self.showJuliaSet()
         return 
 
     def cb_rmColor( self, i):
@@ -2358,7 +2544,7 @@ class mandelBrotSetWidget( QMainWindow):
 
         self.isAnimating = False
 
-        self.logWidget.append( "Scan done, %gs" % (time.time() - startTime))
+        self.logWidget.append( "Scan done, %g s" % (time.time() - startTime))
 
         self.clearScanPars()
 
@@ -2444,8 +2630,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.figM.set_size_inches( self.figSizeM[0], self.figSizeM[1], forward = True)
         self.geomM = self.mgrM.window.geometry()
         self.mgrM.window.setGeometry( 50, 50, self.geomM.width(), self.geomM.height())
-        #print( "+++ cb_mandel: get-size %s rect %s" % ( repr( self.figM.get_size_inches()),
-        # repr( self.mgrM.window.geometry())))
 
         self.showMandelbrotSet()
 
@@ -2479,6 +2663,16 @@ class mandelBrotSetWidget( QMainWindow):
 
     def setDefaults( self):
 
+        self.debugSpeed = "True"
+        if self.debugSpeedAction is not None: 
+            self.debugSpeedAction.setChecked( self.debugSpeed == "True")
+        self.cardioidBulb = "True" 
+        if self.cardioidBulbAction is not None: 
+            self.cardioidBulbAction.setChecked( self.cardioidBulb == "True")
+        self.prange = "True" 
+        if self.prangeAction is not None: 
+            self.prangeAction.setChecked( self.prange == "True")
+
         self.rmColor = 'white'
         self.flagReversed = "False"
         self.flagCyclic = "False"
@@ -2503,12 +2697,25 @@ class mandelBrotSetWidget( QMainWindow):
             if self.cythonAction is not None: 
                 self.cythonAction.setChecked( self.cython == "True")
                 self.tiledAction.setChecked( self.cython == "True")
-        else: 
+            self.numpy = "False" 
+            if self.numpyAction is not None: 
+                self.numpyAction.setChecked( self.numpy == "True")
+        else:
+            self.numpy = "True" 
             self.cython = "False"
             self.tiled = "False"
 
-        if numbaOK: 
-            self.numba = "False"
+        self.numba = "False"
+
+        self.numpyOnly = "False" 
+        if self.numpyOnlyAction is not None: 
+            self.numpyOnlyAction.setChecked( self.numpyOnly == "True")
+
+
+        self.scalar = "False" 
+        if self.scalarAction is not None: 
+            self.scalarAction.setChecked( self.scalar == "True")
+
         self.highPrec = "False"
 
         self.flagM3D = "False"
@@ -2531,8 +2738,6 @@ class mandelBrotSetWidget( QMainWindow):
         self.vmin = 0
         self.vmax = DATA_NORM
 
-        self.convTest = "False" # ... too many blobs
-        self.iConvTest = 0
         self.animateAtConstantWidth = "False"
         self.clip = "True" # 
         self.scanCircle = "False"
@@ -2559,7 +2764,6 @@ class mandelBrotSetWidget( QMainWindow):
         if self.cbar is not None:
             self.cbar.remove()
             self.cbar = None
-        self.debugSpeed = "False"
 
         self.cxM = -0.75
         self.cyM = 0.
@@ -2852,8 +3056,6 @@ class mandelBrotSetWidget( QMainWindow):
             self.cxM = event.xdata
             self.cyM = event.ydata
             self.deltaM = self.deltaM/self.zoom
-            # why was here display = false?
-            #+++self.calcMandelbrotSet( display = False)
             self.calcMandelbrotSet()
             self.showMandelbrotSet()
             self.calcJuliaSet()
@@ -2916,11 +3118,8 @@ class mandelBrotSetWidget( QMainWindow):
     #
     def calcMandelbrotSet( self, display = True):
         """
-        calculates self.dataMandelbrotSet
+        +++ calculates self.dataMandelbrotSet
         """
-        #print( "calcMandelbrotSet: cx %g, cy %g, delta %g" % ( self.cxM, self.cyM, self.deltaM))
-        #return self.calcMandelbrotSet_numpy()
-
         if self.widthM == 256:
             self.vmax = CMAP_MAX - 1
             self.setCurrentIndices()
@@ -2928,7 +3127,7 @@ class mandelBrotSetWidget( QMainWindow):
             return 
             
         if self.smooth == "DZ": 
-            if self.cython == "True": 
+            if self.cython == "True":
                 return self.calcMandelbrotSetDzCython()
             else: 
                 return self.calcMandelbrotSetDZ()
@@ -2936,39 +3135,51 @@ class mandelBrotSetWidget( QMainWindow):
         if self.cython == "True": 
             return self.calcMandelbrotSetCython()
 
-        if numbaOK: 
-            if self.numba == "True": 
-                return self.calcMandelbrotSetNumba()
+        if self.numba == "True": 
+            return self.calcMandelbrotSetNumba()
 
-        self.progressLbl.show()
+        if self.scalar == "True": 
+            return self.calcMandelbrotSetScalar()
+
+        if self.numpy == "False":
+            if cythonOK: 
+                self.cython = "True"
+                self.cythonAction.setChecked( self.cython == "True")
+                return self.calcMandelbrotSetCython()
+            self.logWidget.append( "calcMandelbrotSet: select a method")
+            return 
+
         if display: 
+            self.progressLbl.show()
             self.progressLbl.setText( "Progress: 0/%4d M" % (self.maxIterM))
-        
-        r1 = np.linspace( self.cxM - self.deltaM/2.,
-                          self.cxM + self.deltaM/2.,
-                          self.widthM, dtype=np.float64)
-        r2 = np.linspace( self.cyM - self.deltaM/2.,
-                          self.cyM + self.deltaM/2.,
-                          self.widthM, dtype=np.float64)
-        c = r1 + r2[:,None]*1j
-        self.progressLbl.setStyleSheet("background-color:lightblue")
-
-        escapeCount = np.zeros(c.shape) 
-        z = np.zeros(c.shape, np.complex128)
-
-        self.app.processEvents()
 
         if self.smooth == "DistEst": 
             horizon = 2**40
         else: 
             horizon = 4
         log_horizon = np.log2(np.log(horizon))
+            
+        x = np.linspace( self.cxM - self.deltaM/2.,
+                          self.cxM + self.deltaM/2.,
+                          self.widthM, dtype=np.float64)
+        y = np.linspace( self.cyM - self.deltaM/2.,
+                          self.cyM + self.deltaM/2.,
+                          self.widthM, dtype=np.float64)
+        
+        c = x + y[:,None]*1j
+        self.progressLbl.setStyleSheet("background-color:lightblue")
+        self.app.processEvents()
+
+        z = np.zeros(c.shape, np.complex128)
+
+        escapeCount = np.zeros(c.shape) 
+        
         startTime = time.time()
         for it in range( self.maxIterM):
             #
             # notdone is a 2D array with True/False values
             #
-            if self.deltaM < 1e-11:
+            if self.numpyOnly or self.deltaM < 1e-11: 
                 notdone = np.less( z.real*z.real + z.imag*z.imag, float( horizon))
             else: 
                 notdone = ne.evaluate('z.real*z.real + z.imag*z.imag < %g' % float( horizon))
@@ -2976,57 +3187,54 @@ class mandelBrotSetWidget( QMainWindow):
             # escapeCount is set to it at the positions where notdone is true
             #
             escapeCount[notdone] = it
-            if self.deltaM < 1e-11:
+            if self.numpyOnly or self.deltaM < 1e-11: 
                 z[notdone] = z[notdone]**2 + c[notdone]
             else: 
-                z = ne.evaluate('where(notdone,z**%d+c,z)' % self.power)
+                z = ne.evaluate('where(notdone,z**2+c,z)')
             if (it % 100) == 0 and display:
                 self.progressLbl.setText( "Progress: %4d/%4d M" % ( it, self.maxIterM))
                 self.app.processEvents()
                 self.dataMandelbrotSet = np.copy( escapeCount)
                 self.dataMandelbrotSet3D = np.copy( escapeCount)
-                self.dataMandelbrotSet[ self.dataMandelbrotSet == it] = 0
+                #self.dataMandelbrotSet[ self.dataMandelbrotSet == it] = 0
                 self.showMandelbrotSet()
                 
             if self.stopRequested:
                 break
 
-        self.progressLbl.hide()
-
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= DATA_NORM/float( self.maxIterM) 
-        if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-M %g, Python, min %g, max %g" % 
-                                   (( time.time() - startTime), 
-                                    escapeCount.min(), escapeCount.max()))
+
         self.dataMandelbrotSet3D = np.copy( escapeCount)
-        if self.smooth == "DistEst":
+        #
+        # smoothing algorithm from 
+        # https://linas.org/art-gallery/escape/smooth.html
+        #
+        if self.smooth == "DistEst": 
             temp = np.log( abs(z))
             temp[ temp <= 0.] = LOG_HELPER
-            output = escapeCount
-            corr = np.nan_to_num( escapeCount + 1 - np.log2( temp) + log_horizon)
-            output = np.where(output != 0, corr, output)
-        else: 
-            output = escapeCount
+            escapeCount = np.nan_to_num( escapeCount + 1 - np.log2( temp) + log_horizon)
+        
+        if escapeCount.shape[0] == 10: 
+            print( "calcMandelbrotSet: escapeCount %s" % repr( escapeCount))
 
-        if output.shape[0] == 10: 
-            print( "calcMandelbrotSet: output %s" % repr( output))
-        self.dataMandelbrotSet = output
+        self.dataMandelbrotSet = escapeCount
+        
         self.showMandelbrotSet()
+
+        if self.debugSpeed == "True": 
+            self.logWidget.append( "M: elapsed %5.3f s, Numpy/Numexpr, NumpyOnly %s" % 
+                                   (( time.time() - startTime), repr( self.numpyOnly)))
+
         if display: 
             self.progressLbl.setText( "Progress: %4d/%4d M" % ( it, self.maxIterM))
-        self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
+            self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
+            self.progressLbl.hide()
 
         return 
 
     def calcMandelbrotSetCython( self):
-
-        if self.power != 2:
-            temp = QMessageBox()
-            ret = temp.question(self,'', 
-                                "calcMandelbrotSet: disable cython, if power != 2", temp.Ok )
-
-            return
+        # +++
 
         if self.tiled == "True": 
             self.calcMandelbrotSetCythonTiled()
@@ -3038,6 +3246,7 @@ class mandelBrotSetWidget( QMainWindow):
         else: 
             horizon = 4
         log_horizon = np.log2(np.log(horizon))
+        
         if self.highPrec == "True":
             self.logWidget.append( "Starting highPrec run, slow. ")
             self.app.processEvents()
@@ -3048,29 +3257,32 @@ class mandelBrotSetWidget( QMainWindow):
                 self.cxM + self.deltaM/2., 
                 self.cyM - self.deltaM/2., 
                 self.cyM + self.deltaM/2., 
-                self.maxIterM, horizon, 20)
-        else: 
+                self.maxIterM, horizon, 20, int( self.cardioidBulb == "True"))
+        elif self.prange == "True":  
+            (escapeCount, zAbs) = mandelbrotCython.compute_mandelbrot_parallel( 
+                self.widthM, self.widthM, 
+                self.cxM - self.deltaM/2., 
+                self.cxM + self.deltaM/2., 
+                self.cyM - self.deltaM/2., 
+                self.cyM + self.deltaM/2., 
+                self.maxIterM, horizon, int( self.cardioidBulb == "True"))
+        else:
             (escapeCount, zAbs) = mandelbrotCython.compute_mandelbrot( 
                 self.widthM, self.widthM, 
                 self.cxM - self.deltaM/2., 
                 self.cxM + self.deltaM/2., 
                 self.cyM - self.deltaM/2., 
                 self.cyM + self.deltaM/2., 
-                self.maxIterM, horizon, self.iConvTest)
+                self.maxIterM, horizon, int( self.cardioidBulb == "True"))
 
         corr = DATA_NORM/float( self.maxIterM)
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
+
         if self.debugSpeed == "True": 
-            if self.highPrec == "True": 
-                self.logWidget.append( "Elapsed-M %g, Cython, hp,  min %g, max %g " % 
-                                       (( time.time() - startTime), 
-                                        escapeCount.min(), escapeCount.max()))
-            else: 
-                self.logWidget.append( "Elapsed-M %g, Cython, min %g, max %g " % 
-                                       (( time.time() - startTime), 
-                                        escapeCount.min(), escapeCount.max()))
+            self.logWidget.append( "M: elapsed %5.3f s, Cython, not tiled, CardioidBulb %s, prange %s" % 
+                                   (( time.time()-startTime), repr( self.cardioidBulb), repr( self.prange)))
 
         if self.smooth == "DistEst":
             zAbs[ zAbs <= 0.] = LOG_HELPER
@@ -3086,37 +3298,36 @@ class mandelBrotSetWidget( QMainWindow):
         return 
 
     def calcMandelbrotSetCythonTiled( self):
-        import threading
-
-        width = self.widthM
-        xmin = self.cxM - self.deltaM/2.
-        xmax = self.cxM + self.deltaM/2.
-        ymin = self.cyM - self.deltaM/2.
-        ymax = self.cyM + self.deltaM/2.
+        # +++
 
         if self.smooth == "DistEst": 
             horizon = 2**40
         else: 
             horizon = 4
-
-        log_horizon = np.log2(np.log(horizon))
-
+        width = self.widthM
+        
         mandelbrotTiled.TileWorker.NCOL = NCOL
         mandelbrotTiled.TileWorker.NROW = NROW
         mandelbrotTiled.TileWorker.width = width
         mandelbrotTiled.TileWorker.finalImage = np.zeros(( width, width), dtype=np.float64)
         mandelbrotTiled.TileWorker.finalZAbs = np.zeros(( width, width), dtype=np.float64)
-        mandelbrotTiled.TileWorker.xmin = xmin
-        mandelbrotTiled.TileWorker.xmax = xmax
-        mandelbrotTiled.TileWorker.ymin = ymin
-        mandelbrotTiled.TileWorker.ymax = ymax
+        mandelbrotTiled.TileWorker.xmin = self.cxM - self.deltaM/2.
+        mandelbrotTiled.TileWorker.xmax = self.cxM + self.deltaM/2.
+        mandelbrotTiled.TileWorker.ymin = self.cyM - self.deltaM/2.
+        mandelbrotTiled.TileWorker.ymax = self.cyM + self.deltaM/2.
         mandelbrotTiled.TileWorker.max_iter = self.maxIterM
         mandelbrotTiled.TileWorker.horizon = horizon
-        mandelbrotTiled.TileWorker.convTest = self.convTest
-        mandelbrotTiled.TileWorker.iConvTest = self.iConvTest
+        mandelbrotTiled.TileWorker.cardioidBulb = self.cardioidBulb
+        mandelbrotTiled.TileWorker.prange = self.prange
         mandelbrotTiled.TileWorker.highPrec = self.highPrec
         mandelbrotTiled.TileWorker.finished_count = 0
         mandelbrotTiled.TileWorker.total_tiles = NROW*NCOL
+        
+        #
+        # to ensure that collect() is thread-safe 
+        # if the GUI is updated from collect, signals have to used
+        # because direct GUI updates from threads are unsafe
+        #
         mandelbrotTiled.TileWorker.lock = threading.Lock()
         
         startTime = time.time()
@@ -3128,13 +3339,6 @@ class mandelBrotSetWidget( QMainWindow):
         for row in range( NROW): 
             for col in range( NCOL): 
                 worker = mandelbrotTiled.TileWorker( col, row)
-                #
-                # Copilot: You must ensure collect() is thread-safe 
-                #   (which you already do with TileWorker.lock).
-                #   If you plan to update the GUI from collect(), you must
-                #   use signals — direct GUI updates from threads are unsafe
-                #
-                #worker.finished.connect(worker.collect)
                 workers.append( worker)
                 worker.start()
 
@@ -3158,6 +3362,7 @@ class mandelBrotSetWidget( QMainWindow):
             temp = np.log( zAbs)
             temp[ temp <= 0.] = LOG_HELPER
             output = escapeCount
+            log_horizon = np.log2(np.log(horizon))
             corr = np.nan_to_num( escapeCount + 
                                   1 - np.log2( temp)*corr + log_horizon)
             self.dataMandelbrotSet = np.where(output != 0, corr, output)
@@ -3165,15 +3370,9 @@ class mandelBrotSetWidget( QMainWindow):
             self.dataMandelbrotSet = escapeCount
         
         if self.debugSpeed == "True": 
-            if self.highPrec == "True": 
-                self.logWidget.append( "Elapsed-M %g, Cython, tiled, hp, min %g, max %g " % 
-                                       (( time.time() - startTime), 
-                                        self.dataMandelbrotSet.min(), self.dataMandelbrotSet.max()))
-            else: 
-                if not self.isAnimating: 
-                    self.logWidget.append( "Elapsed-M %g, Cython, tiled, min %g, max %g " % 
-                                           (( time.time() - startTime), 
-                                            self.dataMandelbrotSet.min(), self.dataMandelbrotSet.max()))
+            if not self.isAnimating: 
+                self.logWidget.append( "M: elapsed %5.3f s, Cython, tiled, CardioidBulb %s, prange() %s" % 
+                                       (( time.time() - startTime), repr( self.cardioidBulb), repr( self.prange))) 
 
         
         return
@@ -3212,7 +3411,7 @@ class mandelBrotSetWidget( QMainWindow):
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-M %g, Cython, Dz, min %g, max%g " % 
+            self.logWidget.append( "M: elapsed %5.3f s, Cython, Dz, min %g, max%g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
@@ -3222,7 +3421,7 @@ class mandelBrotSetWidget( QMainWindow):
 
 
     def calcMandelbrotSetDzCythonTiled( self):
-        import threading
+        # +++
 
         width = self.widthM
         xmin = self.cxM - self.deltaM/2.
@@ -3267,14 +3466,14 @@ class mandelBrotSetWidget( QMainWindow):
         norm = result / np.max( result)
         norm = norm ** 0.8  # gamma correction
         norm /= 2.
-        norm *= DATA_NORM
+        norm *= DATA_NORM  
         
         corr = DATA_NORM/float( self.maxIterM)
         escapeCount = np.copy( norm)
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-M %g, Cython, Dz, tiled, min %g, max%g " % 
+            self.logWidget.append( "M: elapsed %5.3f s, Cython, Dz, tiled, min %g, max%g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
@@ -3361,12 +3560,12 @@ class mandelBrotSetWidget( QMainWindow):
             
 
     def calcMandelbrotSetNumba( self):
+        # +++
 
-        if self.power != 2:
-            temp = QMessageBox()
-            ret = temp.question(self,'', 
-                                "calcMandelbrotSet: disable cython, if power != 2", temp.Ok )
-            return
+        if self.smooth != "None": 
+            self.logWidget.append( "calcNumba: smooth must be None'")
+            return 
+            
         # Parameters
         width = self.widthM
         xmin = self.cxM - self.deltaM/2.
@@ -3376,142 +3575,180 @@ class mandelBrotSetWidget( QMainWindow):
 
         max_iter = self.maxIterM
 
+        startTime = time.time()
+        
         # Allocate output arrays
         image_gpu = np.zeros(( width, width), dtype=np.uint32)
-
-        startTime = time.time()
+        """
+        for Mandelbrot set: 
+          - one thread per pixel
+          - threads per block: (16, 16) is a common sweet spot
+          - blockspergrid_x, ~_y: how many blocks are
+            needed to cover the whole image
+            +  (a + b - 1)/b
+              = Even if the image size is not divisible by 16,
+                you still launch enough blocks.
+              = Extra threads simply exit early inside the kernel.
+            + blockspergrid = (63, 63)
+          - 1 Mio threads do not run simultaneously
+            + they are scheduled in warps (32 threads) and blocks
+              (e.g. 256 theads)
+              and they are executed in waves
+            + warps are the physical execution unit
+            + You launch 1,000,000 threads.
+            + The GPU queues them.
+            + It runs as many as it can at once (depending on SM count,
+              occupancy, registers, etc.).
+            + When one warp stalls (e.g., waiting on memory), another warp runs.
+          - SIMT - single instruction multiple threads, SIMT
+          - all 32 threads within one warp
+            + execute the same instruction
+            + at the same time
+            + on different data
+          - each warp executes in lockstep (SIMT)
+        """
         threadsperblock = (16, 16)
+        """
+        block: 16 x 16 threads
+        Warp 0: threads (0 - 31)
+        Warp 1: threads (32 - 63)
+        Warp 2: threads (64 - 95)
+        ...
+        Warp 7: threads (224 - 255)
+        """
         blockspergrid_x = (width + threadsperblock[0] - 1) // threadsperblock[0]
         blockspergrid_y = (width + threadsperblock[1] - 1) // threadsperblock[1]
-        blockspergrid = (blockspergrid_x, blockspergrid_y)
-
-        start_gpu = time.time()
+        blockspergrid = (blockspergrid_x, blockspergrid_y) # (63, 63) 
+        """
+        blocks define cooperation between threads
+          + share data via shared memory
+          + synchronize threads with __syncthreads()
+            (no synchronize across blocks)
+          + cooperate on partial results using shared memory
+        blocks are the unit of scheduling on SMs (streaming multiprocessors)
+        blocks define resource allocation
+          - each block get a chunk of shared memory
+          - ... a budget of registers
+          -  ... a set of warps
+        """
         d_image = cuda.to_device(image_gpu)
-        mandelbrot_kernel[blockspergrid, threadsperblock]( xmin, xmax, ymin, ymax, d_image, max_iter)
+        mandelbrot_kernel[blockspergrid, threadsperblock]( xmin, xmax,
+                                                           ymin, ymax,
+                                                           d_image, max_iter)
+        """
+        obj[ key] is the same as obj.__getitem__( Key)
+        Cuda overrides __getitem__
+        """
         escapeCount = d_image.copy_to_host()
 
         corr = DATA_NORM/float( self.maxIterM)
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
-        if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-M %g, numba, min %g, max %g " % 
+        if self.debugSpeed == "True" and not self.isAnimating: 
+            self.logWidget.append( "M: elapsed %5.3f s, numba, min %g, max %g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
 
         self.dataMandelbrotSet = escapeCount
         return 
 
-    def getNormFunc( self, M):
+    def inCardioid( self, x, y):
+        xm = x - 0.25
+        q = xm * xm + y * y
+        return q * (q + xm) < 0.25 * y * y
 
-        if self.vmax <= self.vmin:
-            temp = QMessageBox()
-            ret = temp.question(self,'',
-                                "getNormFunc: vmax %g <= vmin %g " % (self.vmin, self.vmax), 
-                                temp.Ok )
-            return None
-        #
-        # [vmin, vmax] -> [0, 255]
-        #
-        if self.norm == 'LinNorm':
-            normFunc = utils.LinNorm( vmin=self.vmin, vmax=self.vmax, 
-                                      clip = ( self.clip == "True"))
-        elif self.norm == 'TwoSlopeNorm':
-            normFunc = colors.TwoSlopeNorm( self.normPar, vmin=self.vmin, vmax=self.vmax)
-
-        elif self.norm == 'AsinhNorm':
-            normFunc = colors.AsinhNorm( linear_width = self.normPar, 
-                                         vmin=self.vmin, vmax=self.vmax, 
-                                      clip = ( self.clip == "True"))
-
-        elif self.norm == "PowerNorm":
-            normFunc = colors.PowerNorm( gamma = self.normPar,
-                                         vmin=self.vmin, vmax=self.vmax, 
-                                         clip = ( self.clip == "True"))
-        elif self.norm == "LogNorm":
-            temp = self.vmin
-            if temp <= 0.:
-                temp = 0.1
-            normFunc = colors.LogNorm( vmin=temp, vmax=self.vmax,
-                                       clip = ( self.clip == "True"))
-        elif self.norm == "HistNorm":
-            vmin, vmax = np.percentile(M, [self.normPar, 100. - self.normPar])
-            normFunc = utils.LinNorm( vmin=vmin, vmax=vmax,
-                                       clip = ( self.clip == "True"))
-        elif self.norm == "StretchNorm":
-            self.logWidget.append( "StretchNorm: min, %g, max %g" %
-                                   ( M.min(), M.max()))
-            temp = (M - np.mean(M)) * self.normPar
-            temp = temp - temp.min()
-            self.logWidget.append( "StretchNorm: vmin %g, vmax %g, min, %g, max %g" %
-                                   ( self.vmin, self.vmax, temp.min(), temp.max()))
-            M = np.clip( temp, self.vmin, self.vmax, out = M)
-            normFunc = utils.LinNorm( vmin=self.vmin, vmax=self.vmax,
-                                       clip = ( self.clip == "True"))
-        else:
-            print( "getNormFunc: Failed to identify norm, %s, exit" % self.norm)
-            sys.exit( 255)
-        return normFunc
-    
-    def createDebugColoringOutput( self, M):
-
-        if self.debugColoring == "False":
-            if self.figDebugColoring is not None:
-                plt.close( self.figDebugColoring)
-                self.figDebugColoring = None
-                self.cbar = None
-            return 
-
-        if self.figDebugColoring is None:
-            self.figDebugColoring, self.axDebugColoring = \
-                plt.subplots(4, 1, figsize= self.figSizeC)
-            #for i, ax in enumerate( self.axDebugColoring):
-            #    print(f"Axes {i}:", ax.get_position().bounds)
-            self.figDebugColoring.subplots_adjust(hspace=0.5) 
-            self.figDebugColoring.canvas.mpl_connect("close_event",
-                                                     self.cb_closeFigDebugColoring)
-            self.figDebugColoring.canvas.manager.set_window_title( 'Debug coloring')
-            if self.modeOperation.lower() == 'demo': 
-                self.figDebugColoring.canvas.manager.window.setGeometry( 5332, 535, 433, 668)
-
-        plt.figure( self.figDebugColoring.number)
+    def inBulb( self, x, y):
+        xp = x + 1.0
+        return xp * xp + y * y < 0.0625  # 1/16
         
-        self.axDebugColoring[0].clear()
-        flat_data = M.ravel()
-        self.axDebugColoring[0].hist( flat_data, bins = 256, log = True) 
-        self.axDebugColoring[0].set_title( "Escape Counts")
-
-        normFunc = self.getNormFunc( M)
-        x = np.linspace(0, DATA_NORM, DATA_NORM)
-        y = normFunc( x)
-        self.axDebugColoring[1].clear()
-        self.axDebugColoring[1].plot( x, y)
-        self.axDebugColoring[1].set_title( "%s, normPar %g, vmin %g, vmax %g" % 
-                                          (self.norm, self.normPar, self.vmin, self.vmax))
+    def calcMandelbrotSetScalar( self):
+        # +++
+        if self.smooth != "None":
+            self.logWidget.append( "calcScalar: smooth must be None")
+            return
         
-        self.axDebugColoring[2].clear()
-        M1 = normFunc( M)
-        flat_data = M1.ravel()
-        self.axDebugColoring[2].hist( flat_data, bins = 256, log = True) 
-        self.axDebugColoring[2].set_title( "Normalized Data (no shader)")
-        
-        if self.cbar is not None:
-            self.cbar.remove() # this also destroys the axes, has to be re-created
-            self.axDebugColoring[3] = self.figDebugColoring.add_axes([0.125, 0.11, 0.775, 0.167])
-            self.cbar = None
-
-        self.cbar = self.figDebugColoring.colorbar( self.imM,
-                                                    orientation = 'horizontal', 
-                                                    cax = self.axDebugColoring[3]) 
-        self.cbar.ax.set_title("Colorbar")
+        if self.shaded == "True":
+            self.logWidget.append( "calcScalar: shaded must be False")
+            return
             
-        plt.figure( self.figM.number)
+        startTime = time.time()
+        self.progressLbl.show()
+        self.progressLbl.setText( "Progress: 0/%4d M" % (self.widthM))
+        self.progressLbl.setStyleSheet("background-color:lightblue")
+        self.app.processEvents()
 
-        return
+        width = self.widthM
+        
+        # Create coordinate grid
+        x = np.linspace( self.cxM - self.deltaM/2.,
+                         self.cxM + self.deltaM/2.,
+                         width)
+        y = np.linspace( self.cyM - self.deltaM/2.,
+                         self.cyM + self.deltaM/2., 
+                         width)
+        self.dataMandelbrotSet = np.zeros(( width, width), dtype=np.int32)
+
+        self.scalarRandom = "False"
+        coords = [(i, j) for j in range(width) for i in range(width)]
+        if self.scalarRandom == "True":
+            np.random.shuffle(coords)
+
+        # Mandelbrot iteration (scalar operations on a 2D field)
+        stop = False
+
+        loopCount = 0
+        for i, j in coords: 
+            loopCount += 1
+            if loopCount % (20*width) == 0:
+                self.progressLbl.setText( "Progress: %d/%4d " % (j, width))
+                self.app.processEvents()
+                if (loopCount % (20*width) == 0):
+                    self.showMandelbrotSet()
+                    self.app.processEvents()
+            cx = x[i]
+            cy = y[j]
+            if self.cardioidBulb == "True":
+                if self.inCardioid( cx, cy) or self.inBulb( cx, cy):
+                    self.dataMandelbrotSet[ j, i] = self.maxIterM
+                    continue
+            zx = 0.0
+            zy = 0.0
+            count = 0
+
+            while zx*zx + zy*zy <= 4.0 and count < self.maxIterM:
+                zx_new = zx*zx - zy*zy + cx
+                zy = 2.0*zx*zy + cy
+                zx = zx_new
+                count += 1
+                    
+            if self.stopRequested:
+                stop = True
+                break
+
+            self.dataMandelbrotSet[j, i] = count
+
+            if stop:
+                self.logWidget.append( "calcScalar: stop detected, break") 
+                break
+
+
+        corr = DATA_NORM/float( self.maxIterM)
+        self.dataMandelbrotSet = self.dataMandelbrotSet.astype(np.float64)
+        self.dataMandelbrotSet *= corr
+                
+        if self.debugSpeed == "True": 
+            self.logWidget.append( "M: elapsed %5.3f s, Scalar, CardioidBulb %s" % 
+                                   (( time.time() - startTime), repr( self.cardioidBulb))) 
+        self.progressLbl.setText( "Progress: %4d/%4d M" % ( i, width))
+        self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
+        self.progressLbl.hide()
+        self.showMandelbrotSet()
+        
+        return 
 
     def showMandelbrotSet( self):
         """
-        +++
         displays self.dataMandelbrotSet
 
         About clipping, Copilot: 
@@ -3611,7 +3848,7 @@ class mandelBrotSetWidget( QMainWindow):
             self.axM.set_xlim([ self.cxM - self.deltaM/2., self.cxM + self.deltaM/2.])
             self.axM.set_ylim([ self.cyM - self.deltaM/2., self.cyM + self.deltaM/2.])
 
-            #self.imM.autoscale() 
+            #self.imM.autoscale()
             self.imM.changed()   # force redraw
 
         self.textTitleM.set( text = r'$z_{n+1} = z_n^%d + c, z_0 = 0$' % self.power)
@@ -3619,6 +3856,10 @@ class mandelBrotSetWidget( QMainWindow):
         self.deltaLbl.setText( "Delta: %.2e" % (self.deltaM))
 
         self.showMandelbrotSet3D()
+        #
+        # sonst funktrioniert animation mit numba nicht
+        #
+        self.app.processEvents()
         
         return
 
@@ -3672,15 +3913,25 @@ class mandelBrotSetWidget( QMainWindow):
         return
     
     def calcJuliaSet( self, display = True):
-
+        # 
         if self.juliaMode == 'Off':
             return 
 
         if self.cython == "True":
             return self.calcJuliaSetCython()
 
-        #print( "calcJuliaSet: cx %g, cy %g" % (self.cxJ, self.cyJ))
         argout = True
+
+        self.progressLbl.show()
+        self.progressLbl.setText( "Progress: 0/%4d J" % ( self.maxIterJ))
+        self.progressLbl.setStyleSheet("background-color:lightblue")
+
+        if self.smooth == "DistEst": 
+            horizon = 2**40
+        else: 
+            horizon = 4
+        log_horizon = np.log2(np.log(horizon))
+
         c = complex( self.cxM, self.cyM)
         x = np.linspace( self.cxJ - self.deltaJ/2.,
                          self.cxJ + self.deltaJ/2.,
@@ -3688,52 +3939,59 @@ class mandelBrotSetWidget( QMainWindow):
         y = np.linspace( self.cyJ - self.deltaJ/2.,
                          self.cyJ + self.deltaJ/2.,
                          self.widthJ).reshape(( self.widthJ, 1))
+        #
+        # z: a 2D field containing the start values of the iterations
+        #
         z = x + 1j * y
-
-        # Initialize z to all zero
+        #
+        # c: a 2D field containing the center of the Mandelbrot set 
+        #
         c = np.full(z.shape, c)
-
-        # To keep track in which iteration the point diverged
-        output = np.zeros(z.shape)
-        #output = np.zeros(z.shape, dtype=int)
-        # To keep track on which points did not converge so far
+        
+        escapeCount = np.zeros(z.shape)
         notdone = np.full(c.shape, True, dtype=bool)
 
-        self.progressLbl.setText( "Progress: 0/%4d J" % ( self.maxIterJ))
-        self.progressLbl.setStyleSheet("background-color:lightblue")
-        if self.smooth == "DistEst": 
-            horizon = 2**40
-        else: 
-            horizon = 4
         startTime = time.time()
         for it in range( self.maxIterJ):
-            notdone = ne.evaluate('z.real*z.real + z.imag*z.imag < %g' % float( horizon))
-            output[notdone] = it
-            z = ne.evaluate('where(notdone,z**%d+c,z)' % self.power)
-            self.app.processEvents()
+            if self.numpyOnly or self.deltaM < 1e-11: 
+                notdone = np.less( z.real*z.real + z.imag*z.imag, float( horizon))
+            else: 
+                notdone = ne.evaluate('z.real*z.real + z.imag*z.imag < %g' % float( horizon))
+            #notdone = ne.evaluate('z.real*z.real + z.imag*z.imag < %g' % float( horizon))
+            escapeCount[notdone] = it
+            if self.numpyOnly or self.deltaM < 1e-11: 
+                z[notdone] = z[notdone]**2 + c[notdone]
+            else: 
+                z = ne.evaluate('where(notdone,z**2+c,z)')
+            #z = ne.evaluate('where(notdone,z**2+c,z)')
             if self.stopRequested:
                 argout = False
                 return 
             if display: 
-                self.dataJuliaSet = output
+                self.dataJuliaSet = escapeCount
                 if it % 100 == 0:
                     self.showJuliaSet()
+            self.app.processEvents()
+
+        escapeCount = escapeCount.astype(np.float64)
+        escapeCount *= DATA_NORM/float( self.maxIterJ) 
+
+        if self.smooth == "DistEst": 
+            temp = np.log( abs(z))
+            temp[ temp <= 0.] = LOG_HELPER
+            escapeCount = np.nan_to_num( escapeCount + 1 - np.log2( temp) + log_horizon)
+            
+        self.dataJuliaSet = escapeCount
+        
+        self.showJuliaSet()
 
         if self.debugSpeed == "True": 
             if not self.isAnimating: 
-                self.logWidget.append( "Elapsed-J %g, Python  " % (time.time() - startTime))
-        output = output.astype(np.float64)
-        output *= DATA_NORM/float( self.maxIterJ) 
-
-        if self.smooth == "DistEst": 
-            log_horizon = np.log2(np.log(horizon))
-            temp = np.log( abs(z))
-            temp[ temp <= 0.] = LOG_HELPER
-            output = np.nan_to_num( output + 1 - np.log2( temp) + log_horizon) 
-        self.dataJuliaSet = output
-        self.showJuliaSet()
+                self.logWidget.append( "J: elapsed %5.3f s, Python, NumpyOnly %s  " % 
+                                       ((time.time() - startTime), repr( self.numpyOnly)))
         self.progressLbl.setText( "Progress: %4d/%4d J" % ( it, self.maxIterJ))
         self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
+        self.progressLbl.hide()
         return argout
     
     def calcJuliaSetCython( self, display = True):
@@ -3763,7 +4021,9 @@ class mandelBrotSetWidget( QMainWindow):
                                                          self.maxIterJ, horizon)
 
         if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-J %g, Cython" % (time.time() - startTime))
+            if not self.isAnimating: 
+                self.logWidget.append( "J: elapsed %5.3f s, Cython" % (time.time() - startTime))
+
         output = output.astype(np.float64)
         output *= DATA_NORM/float( self.maxIterJ) 
 
@@ -3835,7 +4095,6 @@ class mandelBrotSetWidget( QMainWindow):
         corr = DATA_NORM/float( self.maxIterM)
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
-        #+++escapeCount[ escapeCount >= (DATA_NORM - 1)] = 0
 
         if self.smooth == "DistEst":
             zAbs[ zAbs <= 0.] = LOG_HELPER
@@ -3849,10 +4108,9 @@ class mandelBrotSetWidget( QMainWindow):
             self.dataJuliaSet = escapeCount
         
         if self.debugSpeed == "True": 
-            self.logWidget.append( "Elapsed-J %g, Cython, tiled, min %g, max %g " % 
-                                   (( time.time() - startTime), 
-                                    self.dataJuliaSet.min(), self.dataJuliaSet.max()))
-
+            if not self.isAnimating: 
+                self.logWidget.append( "J: elapsed %5.3f s, Cython, tiled" % 
+                                       (( time.time() - startTime)))
         
         return
     
@@ -4079,9 +4337,8 @@ above mentioned formula, except that z(0) is set to c.\
         QMessageBox.about(self, self.tr("Help Place"), self.tr(
             "<h3> Flags </h3>"
             "<ul>"
-            "<li> Cython - The calculation is done in C using the cython interface. </li>"
-            "<li> Tiled - The calculation is done multi-threaded with each thread taking care of a tile, a part of the escape count field. </li>"
-            "<li> ConvTest - During animated zooms a convergence test can applied allowing to identify members of the Mandelbrot set quickly. At certain regions this method creates artefacts, blobs. If ConTest is not checked, the convergence test is not done. </li>"
+            "<li> Cython/C - The calculation is done in Cython/C </li>"
+            "<li> Cython/C-tiled - The calculation is done multi-threaded with each thread taking care of a tile, a part of the escape count field. </li>"
             "<li> Animate uses constant width - animated zooms are accelerated by reducing the width by a factor of 2. At the endpoint the width is resetted. If this flag is checked, the width is not changed. </li>"
             "<li> DebugSpiral - If checked, debug information for spiral animated zooms is displayed. </li>"
             "<li> DebugColoring - If checked, debug information for coloring is displayed. A histogramm of the escape count field, the normalization function, the normalized data and a color bar. </li>"
@@ -4091,21 +4348,153 @@ above mentioned formula, except that z(0) is set to c.\
                 ))
 
 #
-#@cuda.jit
-#def mandelbrot_kernel( xmin, xmax, ymin, ymax, image, max_iter):
-#    height, width = image.shape
-#    x, y = cuda.grid(2)
-#    if x < width and y < height:
-#        real = xmin + x * (xmax - xmin) / width
-#        imag = ymin + y * (ymax - ymin) / height
-#        c = complex(real, imag)
-#        z = 0j
-#        count = 0
-#        while abs(z) <= 2 and count < max_iter:
-#            z = z*z + c
-#            count += 1
-#        image[y, x] = count
-#    return
+
+    def getNormFunc( self, M):
+
+        if self.vmax <= self.vmin:
+            temp = QMessageBox()
+            ret = temp.question(self,'',
+                                "getNormFunc: vmax %g <= vmin %g " % (self.vmin, self.vmax), 
+                                temp.Ok )
+            return None
+        #
+        # [vmin, vmax] -> [0, 255]
+        #
+        if self.norm == 'LinNorm':
+            normFunc = utils.LinNorm( vmin=self.vmin, vmax=self.vmax, 
+                                      clip = ( self.clip == "True"))
+        elif self.norm == 'TwoSlopeNorm':
+            normFunc = colors.TwoSlopeNorm( self.normPar, vmin=self.vmin, vmax=self.vmax)
+
+        elif self.norm == 'AsinhNorm':
+            normFunc = colors.AsinhNorm( linear_width = self.normPar, 
+                                         vmin=self.vmin, vmax=self.vmax, 
+                                      clip = ( self.clip == "True"))
+
+        elif self.norm == "PowerNorm":
+            normFunc = colors.PowerNorm( gamma = self.normPar,
+                                         vmin=self.vmin, vmax=self.vmax, 
+                                         clip = ( self.clip == "True"))
+        elif self.norm == "LogNorm":
+            temp = self.vmin
+            if temp <= 0.:
+                temp = 0.1
+            normFunc = colors.LogNorm( vmin=temp, vmax=self.vmax,
+                                       clip = ( self.clip == "True"))
+        elif self.norm == "HistNorm":
+            vmin, vmax = np.percentile(M, [self.normPar, 100. - self.normPar])
+            normFunc = utils.LinNorm( vmin=vmin, vmax=vmax,
+                                       clip = ( self.clip == "True"))
+        elif self.norm == "StretchNorm":
+            self.logWidget.append( "StretchNorm: min, %g, max %g" %
+                                   ( M.min(), M.max()))
+            temp = (M - np.mean(M)) * self.normPar
+            temp = temp - temp.min()
+            self.logWidget.append( "StretchNorm: vmin %g, vmax %g, min, %g, max %g" %
+                                   ( self.vmin, self.vmax, temp.min(), temp.max()))
+            M = np.clip( temp, self.vmin, self.vmax, out = M)
+            normFunc = utils.LinNorm( vmin=self.vmin, vmax=self.vmax,
+                                       clip = ( self.clip == "True"))
+        else:
+            print( "getNormFunc: Failed to identify norm, %s, exit" % self.norm)
+            sys.exit( 255)
+        return normFunc
+    
+    def createDebugColoringOutput( self, M):
+
+        if self.debugColoring == "False":
+            if self.figDebugColoring is not None:
+                plt.close( self.figDebugColoring)
+                self.figDebugColoring = None
+                self.cbar = None
+            return 
+
+        if self.figDebugColoring is None:
+            self.figDebugColoring, self.axDebugColoring = \
+                plt.subplots(4, 1, figsize= self.figSizeC)
+            #for i, ax in enumerate( self.axDebugColoring):
+            #    print(f"Axes {i}:", ax.get_position().bounds)
+            self.figDebugColoring.subplots_adjust(hspace=0.5) 
+            self.figDebugColoring.canvas.mpl_connect("close_event",
+                                                     self.cb_closeFigDebugColoring)
+            self.figDebugColoring.canvas.manager.set_window_title( 'Debug coloring')
+            if self.modeOperation.lower() == 'demo': 
+                self.figDebugColoring.canvas.manager.window.setGeometry( 5332, 535, 433, 668)
+
+        plt.figure( self.figDebugColoring.number)
+        
+        self.axDebugColoring[0].clear()
+        flat_data = M.ravel()
+        self.axDebugColoring[0].hist( flat_data, bins = 256, log = True) 
+        self.axDebugColoring[0].set_title( "Escape Counts")
+
+        normFunc = self.getNormFunc( M)
+        x = np.linspace(0, DATA_NORM, DATA_NORM)
+        y = normFunc( x)
+        self.axDebugColoring[1].clear()
+        self.axDebugColoring[1].plot( x, y)
+        self.axDebugColoring[1].set_title( "%s, normPar %g, vmin %g, vmax %g" % 
+                                          (self.norm, self.normPar, self.vmin, self.vmax))
+        
+        self.axDebugColoring[2].clear()
+        M1 = normFunc( M)
+        flat_data = M1.ravel()
+        self.axDebugColoring[2].hist( flat_data, bins = 256, log = True) 
+        self.axDebugColoring[2].set_title( "Normalized Data (no shader)")
+        
+        if self.cbar is not None:
+            self.cbar.remove() # this also destroys the axes, has to be re-created
+            self.axDebugColoring[3] = self.figDebugColoring.add_axes([0.125, 0.11, 0.775, 0.167])
+            self.cbar = None
+
+        self.cbar = self.figDebugColoring.colorbar( self.imM,
+                                                    orientation = 'horizontal', 
+                                                    cax = self.axDebugColoring[3]) 
+        self.cbar.ax.set_title("Colorbar")
+            
+        plt.figure( self.figM.number)
+
+        return
+
+if numbaOK: 
+
+    @cuda.jit
+    def in_cardioid( x, y):
+        xm = x - 0.25
+        q = xm * xm + y * y
+        return q * (q + xm) < 0.25 * y * y
+
+    @cuda.jit
+    def in_bulb(x, y):
+        xp = x + 1.0
+        return xp * xp + y * y < 0.0625  # 1/16
+
+    # decorator: compile python function into a GPU kernel
+    @cuda.jit
+    def mandelbrot_kernel( xmin, xmax, ymin, ymax, image, max_iter):
+        height, width = image.shape
+        x, y = cuda.grid(2)
+        """
+        It expands to:
+        x=threadIdx.x + blockIdx.x * blockDim.x
+        y=threadIdx.y + blockIdx.y * blockDim.y
+        So each thread gets a unique (x, y) pair.
+        """
+        if x < width and y < height:
+            real = xmin + x * (xmax - xmin) / width
+            imag = ymin + y * (ymax - ymin) / height
+            #
+            if in_cardioid( real, imag) or in_bulb( real, imag):
+                image[ y, x] = max_iter
+            else: 
+                c = complex(real, imag)
+                z = 0j
+                count = 0
+                while abs(z) <= 2 and count < max_iter:
+                    z = z*z + c
+                    count += 1
+                image[y, x] = count
+        return
 
 def parseCLI():
     import argparse

@@ -52,12 +52,15 @@ class TileWorker(QThread):
             ( tile, zAbs) = mandelbrotCython.compute_mandelbrot_hp(
                 w, h, xmin, xmax, ymin, ymax, 
                 self.max_iter, self.horizon, 20)
+        elif self.prange == "True":
+            ( tile, zAbs) = mandelbrotCython.compute_mandelbrot_parallel(
+                w, h, xmin, xmax, ymin, ymax, 
+                self.max_iter, self.horizon, int( self.cardioidBulb == "True"))
         else:
             ( tile, zAbs) = mandelbrotCython.compute_mandelbrot(
                 w, h, xmin, xmax, ymin, ymax, 
-                self.max_iter, self.horizon, self.iConvTest)
+                self.max_iter, self.horizon, int( self.cardioidBulb == "True"))
         self.collect(self.col, self.row, tile, zAbs)
-        #self.finished.emit(self.row, self.col, tile, zAbs)
 
 class TileWorkerDz(QThread):
 
