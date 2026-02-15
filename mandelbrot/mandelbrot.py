@@ -69,7 +69,7 @@ ALTDEG_VALUES = [ 10, 1, 5, 20, 30, 40, 50, 60, 70, 80, 90]
 ANIMATIONCOLOR_VALUES = [ 'Yes', 'No']
 ANIMATIONFACTOR_VALUES = [ 0.97, 0.99, 0.98, 0.97, 0.96, 0.95]
 BLEND_MODE_VALUES = [ 'overlay', 'hsv', 'soft'] 
-VERT_EXAG_VALUES = [ 1., 1.5, 2., 3., 4., 5., 10., 20, 50.]
+VERT_EXAG_VALUES = [ 1., 1.5, 2., 3., 4., 5., 10., 20, 50., 100, 200, 300, 500]
 
 MAX_ITER_VALUES = [ 512, 16, 32, 64, 128, 256, 384, 512, 768,
                     1024, 1536, 2048, 4096, 8192, 16384, 32768]
@@ -3002,9 +3002,11 @@ class mandelBrotSetWidget( QMainWindow):
         #
         # Z**2 = (x**2 - y**2) + i*x*y
         #
-        x = [event.xdata]
-        y = [event.ydata]
-        for n in range( 1, 100):
+        #x = [event.xdata]
+        #y = [event.ydata]
+        x = [0.]
+        y = [0.]
+        for n in range( 100):
             x.append( x[n-1]**2 - y[n-1]**2 + event.xdata)
             y.append( 2.*x[n-1]*y[n-1] + event.ydata)
             if (x[-1]**2 + y[-1]**2) > 20:

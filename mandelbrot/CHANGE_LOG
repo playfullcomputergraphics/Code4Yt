@@ -1,4 +1,8 @@
 
+12.2.2026
+
+  iterPath to start at ( 0, 0) 
+
 5.2.2026
 
   Cython/C: added prange() option, parallel range() 

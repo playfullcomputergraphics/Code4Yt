@@ -60,6 +60,9 @@ class places( QMainWindow):
             #self.setFixedSize( 562, 664)
             self.setGeometry( screens[1].geometry().x() + 870,
                               screens[1].geometry().y() + 10, 1000, 500)
+        else:
+            self.setFixedSize( 900, 630)
+            
         self.show() # placing show() before the next statement is important!
         self.app.processEvents()
         
@@ -162,6 +165,7 @@ class places( QMainWindow):
         iOff += 1
         #
         # horizontal line
+        # named files
         #
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
@@ -172,6 +176,33 @@ class places( QMainWindow):
         self.gridLayout.addWidget( QLabel( "Named .png  files"), iOff, 0)
         iOff += 1
         self.thumbnails = glob.glob( "./places/MBN_*.png")
+        self.thumbnails.sort( key=os.path.getmtime)
+        self.thumbnails.reverse()
+        for i, path in enumerate( self.thumbnails):
+            thumb = ClickableThumbnail( path)
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled( 150, 150))
+            thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
+            thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
+            thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
+            vLayout = QVBoxLayout()
+            vLayout.addWidget( thumb)
+            vLayout.addWidget( QLabel( path.split('/')[-1]))
+            row = (i // ncol) + iOff
+            col = i % ncol
+            self.gridLayout.addLayout( vLayout, row, col) 
+        #
+        # horizontal line
+        # named and published files
+        #
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        self.gridLayout.addWidget(line, iOff, 0, 1, ncol)
+        iOff += 1
+        
+        self.gridLayout.addWidget( QLabel( "Named and published .png  files"), iOff, 0)
+        iOff += 1
+        self.thumbnails = glob.glob( "./places/MBNP_*.png")
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
         for i, path in enumerate( self.thumbnails):
@@ -236,8 +267,8 @@ class places( QMainWindow):
                 
     def mkFileDeleteCb( self, fName):
         def f():
-            if fName.find( "MBN_") > 0:
-                self.parent.logWidget.append( "MBN_ files are not deleted this way")
+            if fName.find( "MBN_") > 0 or fName.find( "MBNP_") > 0:
+                self.parent.logWidget.append( "MBN_, MBNP_ files are not deleted this way")
                 return
                 
             yesNo = QMessageBox()

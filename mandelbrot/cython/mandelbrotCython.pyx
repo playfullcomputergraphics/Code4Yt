@@ -81,7 +81,6 @@ def compute_mandelbrot(int width, int height,
 
     return image, np.sqrt(zAbs)
 
-
 cdef void compute_row(
         int i,
         int width,
