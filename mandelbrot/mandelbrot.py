@@ -287,6 +287,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.debugSpeedAction = None
         self.lastFileRead = None
         self.centerHsh = {}
+        self.resetMarker = None
         return 
 
     def __setattr__( self, name, value):
@@ -2663,6 +2664,11 @@ class mandelBrotSetWidget( QMainWindow):
 
     def setDefaults( self):
 
+        self.rmColor = 'white'
+        if self.resetMarker is not None: 
+            self.resetMarker.set( color=self.rmColor) 
+            self.rmColorAction.setChecked( self.rmColor == "black")
+        
         self.debugSpeed = "True"
         if self.debugSpeedAction is not None: 
             self.debugSpeedAction.setChecked( self.debugSpeed == "True")
@@ -3225,7 +3231,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.showMandelbrotSet()
 
         if self.debugSpeed == "True": 
-            self.logWidget.append( "M: elapsed %5.3f s, Numpy/Numexpr, NumpyOnly %s" % 
+            self.logWidget.append( "M: %5.3f s, Numpy/Numexpr, NumpyOnly %s" % 
                                    (( time.time() - startTime), repr( self.numpyOnly)))
 
         if display: 
@@ -3283,7 +3289,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
 
         if self.debugSpeed == "True": 
-            self.logWidget.append( "M: elapsed %5.3f s, Cython, not tiled, CardioidBulb %s, prange %s" % 
+            self.logWidget.append( "M: %5.3f s, Cython, not tiled, CardioidBulb %s, prange() %s" % 
                                    (( time.time()-startTime), repr( self.cardioidBulb), repr( self.prange)))
 
         if self.smooth == "DistEst":
@@ -3373,7 +3379,7 @@ class mandelBrotSetWidget( QMainWindow):
         
         if self.debugSpeed == "True": 
             if not self.isAnimating: 
-                self.logWidget.append( "M: elapsed %5.3f s, Cython, tiled, CardioidBulb %s, prange() %s" % 
+                self.logWidget.append( "M: %5.3f s, Cython, tiled, CardioidBulb %s, prange() %s" % 
                                        (( time.time() - startTime), repr( self.cardioidBulb), repr( self.prange))) 
 
         
@@ -3413,7 +3419,7 @@ class mandelBrotSetWidget( QMainWindow):
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         if self.debugSpeed == "True": 
-            self.logWidget.append( "M: elapsed %5.3f s, Cython, Dz, min %g, max%g " % 
+            self.logWidget.append( "M: %5.3f s, Cython, Dz, min %g, max%g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
@@ -3475,7 +3481,7 @@ class mandelBrotSetWidget( QMainWindow):
         escapeCount = escapeCount.astype(np.float64)
         escapeCount *= corr
         if self.debugSpeed == "True": 
-            self.logWidget.append( "M: elapsed %5.3f s, Cython, Dz, tiled, min %g, max%g " % 
+            self.logWidget.append( "%5.3f s, Cython, Dz, tiled, min %g, max%g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
@@ -3648,7 +3654,7 @@ class mandelBrotSetWidget( QMainWindow):
         escapeCount *= corr
         self.dataMandelbrotSet3D = np.copy( escapeCount)        
         if self.debugSpeed == "True" and not self.isAnimating: 
-            self.logWidget.append( "M: elapsed %5.3f s, numba, min %g, max %g " % 
+            self.logWidget.append( "M: %5.3f s, numba, min %g, max %g " % 
                                    (( time.time() - startTime), 
                                     escapeCount.min(), escapeCount.max()))
 
@@ -3740,7 +3746,7 @@ class mandelBrotSetWidget( QMainWindow):
         self.dataMandelbrotSet *= corr
                 
         if self.debugSpeed == "True": 
-            self.logWidget.append( "M: elapsed %5.3f s, Scalar, CardioidBulb %s" % 
+            self.logWidget.append( "M: %5.3f s, Scalar, CardioidBulb %s" % 
                                    (( time.time() - startTime), repr( self.cardioidBulb))) 
         self.progressLbl.setText( "Progress: %4d/%4d M" % ( i, width))
         self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
@@ -3989,7 +3995,7 @@ class mandelBrotSetWidget( QMainWindow):
 
         if self.debugSpeed == "True": 
             if not self.isAnimating: 
-                self.logWidget.append( "J: elapsed %5.3f s, Python, NumpyOnly %s  " % 
+                self.logWidget.append( "J: %5.3f s, Python, NumpyOnly %s  " % 
                                        ((time.time() - startTime), repr( self.numpyOnly)))
         self.progressLbl.setText( "Progress: %4d/%4d J" % ( it, self.maxIterJ))
         self.progressLbl.setStyleSheet("background-color:%s" % self.progressLblBg)
@@ -4024,7 +4030,7 @@ class mandelBrotSetWidget( QMainWindow):
 
         if self.debugSpeed == "True": 
             if not self.isAnimating: 
-                self.logWidget.append( "J: elapsed %5.3f s, Cython" % (time.time() - startTime))
+                self.logWidget.append( "J: %5.3f s, Cython" % (time.time() - startTime))
 
         output = output.astype(np.float64)
         output *= DATA_NORM/float( self.maxIterJ) 
@@ -4111,7 +4117,7 @@ class mandelBrotSetWidget( QMainWindow):
         
         if self.debugSpeed == "True": 
             if not self.isAnimating: 
-                self.logWidget.append( "J: elapsed %5.3f s, Cython, tiled" % 
+                self.logWidget.append( "J: %5.3f s, Cython, tiled" % 
                                        (( time.time() - startTime)))
         
         return

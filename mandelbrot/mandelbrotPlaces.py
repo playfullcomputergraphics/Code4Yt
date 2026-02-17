@@ -190,6 +190,9 @@ class places( QMainWindow):
             row = (i // ncol) + iOff
             col = i % ncol
             self.gridLayout.addLayout( vLayout, row, col) 
+            iOff = row
+
+        iOff += 1
         #
         # horizontal line
         # named and published files
@@ -267,13 +270,15 @@ class places( QMainWindow):
                 
     def mkFileDeleteCb( self, fName):
         def f():
-            if fName.find( "MBN_") > 0 or fName.find( "MBNP_") > 0:
-                self.parent.logWidget.append( "MBN_, MBNP_ files are not deleted this way")
-                return
-                
             yesNo = QMessageBox()
             ret = yesNo.question(self,'', "Delete %s" % fName, yesNo.Yes | yesNo.No)
             if ret == yesNo.Yes:
+                if fName.find( "MBN_") > 0 or fName.find( "MBNP_") > 0:
+                    ret = yesNo.question(self,'', "Really delete a MBN_ or MBNP_ file",
+                                         yesNo.Yes | yesNo.No)
+                    if ret == yesNo.No:
+                        return 
+
                 os.remove( fName)
                 self.parent.logWidget.append( "Deleted %s" % fName)
                 self.prepareCentralPart()
