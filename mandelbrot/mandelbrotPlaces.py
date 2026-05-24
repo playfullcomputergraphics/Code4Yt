@@ -8,49 +8,27 @@ import glob, os, math
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 import numpy as np
-from PIL import Image
+import utils
 
-CMAP_MAX = 1024 # appears also in mandelbrot.py
+THUMB_SIZE = 180
 
-class ClickableThumbnail(QLabel):
-    clickedMbLeft = pyqtSignal(str)  # Emit the image path
-    clickedMbRight = pyqtSignal(str)  # Emit the image path
-    clickedMbMiddle = pyqtSignal(str)  # Emit the image path
-
-    def __init__(self, image_path, parent=None):
-        super().__init__(parent)
-        self.image_path = image_path
-
-    def mousePressEvent(self, event):
-        if hasattr( self.parent, 'resetMarker'):
-            self.parent.resetMarker.set( text = r'') 
-        if event.button() == 1:
-            self.clickedMbLeft.emit(self.image_path)
-        elif event.button() == 2:
-            self.clickedMbRight.emit(self.image_path)
-        elif event.button() == 4:
-            self.clickedMbMiddle.emit(self.image_path)
-        return 
 
 class places( QMainWindow):
-    def __init__(self, app, parent=None):
+    def __init__(self, app, parent=None, prefix = None, viewerFk = None):
         QWidget.__init__(self, parent)
         
         self.setWindowTitle("Places (MB-Left reads a file incl. metadata, MB-Right deletes, MB-Middle shows)")
         self.app = app
+        self.name = "places"
         self.parent = parent
+        self.prefix = prefix
+        self.viewerFk = viewerFk
+        if self.prefix is None:
+            self.prefix = "MB"
         geoScreen = QDesktopWidget().screenGeometry(-1)
         self.geoWidth = geoScreen.size().width()
         self.geoHeight = geoScreen.size().height()
 
-        """
-        font = QFont( 'Sans Serif')
-        if self.geoWidth <= 1920:
-            font.setPixelSize( 16)
-        else:
-            font.setPixelSize( 22)
-        self.app.setFont( font)
-        """
         self.w = None
         self.gridLayout = None
         self.scrollArea = None
@@ -61,15 +39,18 @@ class places( QMainWindow):
             self.setGeometry( screens[1].geometry().x() + 870,
                               screens[1].geometry().y() + 10, 1000, 500)
         else:
-            self.setFixedSize( 900, 630)
+            self.setFixedSize( 1000, 630)
             
-        self.show() # placing show() before the next statement is important!
         self.app.processEvents()
+
+        if self.prefix == "DynOp":
+            self.path2Lbl = {}
+        else:
+            self.path2Lbl = None
         
         self.prepareMenuBar()
-        self.prepareCentralPart()
+        self.prepareCentralWidget()
         self.prepareStatusBar()
-        self.show()
 
         return
 
@@ -119,48 +100,61 @@ class places( QMainWindow):
     #    
     # === the central part
     #    
-    def prepareCentralPart( self):
+    def prepareCentralWidget( self):
 
         if self.scrollArea is None: 
             self.scrollArea = QScrollArea()
             self.scrollArea.setWidgetResizable(True)
-            self.scrollArea.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Expanding)
-            self.scrollArea.setMinimumWidth( 800)
+            #self.scrollArea.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Expanding)
+            #self.scrollArea.setMinimumWidth( 1000)
 
         if self.w is None: 
             self.w = QWidget()
             self.scrollArea.setWidget(self.w)
             self.setCentralWidget(self.scrollArea)
 
+        if self.viewerFk is not None and len( self.viewerFk.arrFkPath) > 0:
+            for elm in self.viewerFk.arrFkPath:
+                elm.setParent( None)
+            self.viewerFk.arrFkPath = []
+            
         if self.gridLayout is None:
             self.gridLayout = QGridLayout()
             self.w.setLayout( self.gridLayout)
         else:
             self.clear_layout( self.gridLayout) 
-                    
-        self.thumbnails = glob.glob( "./places/MB_*.png")
+        #
+        # find the temporary files: MB_, DynOp_
+        #
+        self.thumbnails = glob.glob( "./places/%s_*.png" % self.prefix)
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
         #ncol = int( math.sqrt( len( self.thumbnails)))
         ncol = 5
 
         iOff = 0
+        row = 0
+        self.checkBoxes = []
         self.setStyleSheet("QLabel { font-size: 10pt; }")
+        # +++
         for i, path in enumerate( self.thumbnails):
-            thumb = ClickableThumbnail( path)
-            thumb.setPixmap(QPixmap(thumb.image_path).scaled(150, 150))
+            thumb = utils.ClickableThumbnail( path, parent = self)
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled( THUMB_SIZE, THUMB_SIZE))
             thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
             thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
             vLayout = QVBoxLayout()
             vLayout.addWidget( thumb)
-            temp = QLabel( path.split('/')[-1])
-            vLayout.addWidget( temp)
-            
+            temp = QCheckBox( utils.formatThumbLabel( path))
+            self.checkBoxes.append( (temp, path))
+            vLayout.addWidget( temp) 
             row = (i // ncol)
             col = i % ncol
             self.gridLayout.addLayout( vLayout, row, col)
-            iOff = row
+            if self.prefix == "DynOp":
+                lbl = utils.handleFeedAndKillRate( path, self.viewerFk)
+                self.path2Lbl[ path] = lbl
+        iOff = row
 
         iOff += 1
         #
@@ -175,12 +169,16 @@ class places( QMainWindow):
         
         self.gridLayout.addWidget( QLabel( "Named .png  files"), iOff, 0)
         iOff += 1
-        self.thumbnails = glob.glob( "./places/MBN_*.png")
-        self.thumbnails.sort( key=os.path.getmtime)
-        self.thumbnails.reverse()
+        #
+        # find the named files: MBN_, DynOpN_
+        #
+        self.thumbnails = glob.glob( "./places/%sN_*.png" % self.prefix)
+        #self.thumbnails.sort( key=os.path.getmtime)
+        self.thumbnails.sort()
+        #self.thumbnails.reverse()
         for i, path in enumerate( self.thumbnails):
-            thumb = ClickableThumbnail( path)
-            thumb.setPixmap(QPixmap(thumb.image_path).scaled( 150, 150))
+            thumb = utils.ClickableThumbnail( path, parent = self)
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled( THUMB_SIZE, THUMB_SIZE))
             thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
             thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
@@ -190,7 +188,10 @@ class places( QMainWindow):
             row = (i // ncol) + iOff
             col = i % ncol
             self.gridLayout.addLayout( vLayout, row, col) 
-            iOff = row
+            if self.prefix == "DynOp":
+                lbl = utils.handleFeedAndKillRate( path, self.viewerFk)
+                self.path2Lbl[ path] = lbl
+        iOff = row
 
         iOff += 1
         #
@@ -203,14 +204,17 @@ class places( QMainWindow):
         self.gridLayout.addWidget(line, iOff, 0, 1, ncol)
         iOff += 1
         
-        self.gridLayout.addWidget( QLabel( "Named and published .png  files"), iOff, 0)
+        self.gridLayout.addWidget( QLabel( "Named and published files"), iOff, 0)
         iOff += 1
-        self.thumbnails = glob.glob( "./places/MBNP_*.png")
+        #
+        # find the published files: MBNP_, DynOpNP_
+        #
+        self.thumbnails = glob.glob( "./places/%sNP_*.png" % self.prefix)
         self.thumbnails.sort( key=os.path.getmtime)
         self.thumbnails.reverse()
         for i, path in enumerate( self.thumbnails):
-            thumb = ClickableThumbnail( path)
-            thumb.setPixmap(QPixmap(thumb.image_path).scaled( 150, 150))
+            thumb = utils.ClickableThumbnail( path, parent = self)
+            thumb.setPixmap(QPixmap(thumb.image_path).scaled( THUMB_SIZE, THUMB_SIZE))
             thumb.clickedMbLeft.connect( self.mkFileReadCb( path))
             thumb.clickedMbRight.connect( self.mkFileDeleteCb( path))
             thumb.clickedMbMiddle.connect( self.mkShowPngCb( path))
@@ -220,6 +224,9 @@ class places( QMainWindow):
             row = (i // ncol) + iOff
             col = i % ncol
             self.gridLayout.addLayout( vLayout, row, col) 
+            if self.prefix == "DynOp":
+                lbl = utils.handleFeedAndKillRate( path, self.viewerFk)
+                self.path2Lbl[ path] = lbl
 
         return 
     #
@@ -229,15 +236,31 @@ class places( QMainWindow):
         self.statusBar = QStatusBar()
         self.setStatusBar( self.statusBar)
         #
+        # Delete
+        #
+        temp = QPushButton("Delete")
+        temp.clicked.connect( self.cb_delete)       
+        self.statusBar.addWidget( temp)
+        #
         # quit
         #
         quit = QPushButton("&Quit")
         quit.clicked.connect( self.cb_close)       
         self.statusBar.addPermanentWidget( quit)
         return 
+
     #
     #  === callbacks
     #
+    def cb_delete( self):
+        for elm in self.checkBoxes:
+            if elm[0].isChecked():
+                os.remove( elm[1])
+                self.parent.logWidget.append( "Deleted %s" % elm[1])
+        self.prepareCentralWidget()
+
+        return
+    
     def cb_helpWidget(self):
         QMessageBox.about(self, self.tr("Help Widget"), self.tr(
             "<h3> Help</h3>"
@@ -249,23 +272,41 @@ class places( QMainWindow):
             "</ul>" 
                 ))
     def cb_close( self):
-        self.close()
+        #self.close()
+        self.hide()
         return
 
     def mkFileReadCb( self, fName):
+        #print( "%s.mkFileReadCb for %s" % (self.name, fName))
         def f():
-            self.parent.readFile( fName)
+            self.cb_close()
+
+            if self.parent.name == "MBSMainWindow":
+                mbsObj = self.parent
+                dynOpObj = self.parent.operatorWidget
+                colorWidgetObj = self.parent.colorWidget
+                colorParsObj = self.parent.colorPars
+            else: 
+                mbsObj = None
+                dynOpObj = self.parent
+                colorWidgetObj = self.parent.colorWidget
+                colorParsObj = self.parent.colorPars
+                
+            utils.readPng( fName,
+                           MBSObj = mbsObj, 
+                           DynOpObj = dynOpObj,
+                           ColorWidgetObj = colorWidgetObj,
+                           ColorParsObj = colorParsObj)
+            
             return
         return f
 
     def clearGridLayout( self):
-        print( "clearGrid ") 
         while self.gridLayout.count():
             item = self.gridLayout.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
-        print( "clearGrid DONE")
         return 
                 
     def mkFileDeleteCb( self, fName):
@@ -281,7 +322,7 @@ class places( QMainWindow):
 
                 os.remove( fName)
                 self.parent.logWidget.append( "Deleted %s" % fName)
-                self.prepareCentralPart()
+                self.prepareCentralWidget()
                 
             else: 
                 self.parent.logWidget.append( "Aborted")
@@ -291,9 +332,11 @@ class places( QMainWindow):
                 
     def mkShowPngCb( self, fName):
         def f():
-            plt.figure(1) 
-            img = np.asarray(Image.open( fName))
-            self.parent.imM.set( data = img)
+            self.parent.viewerMain.displayPng( fName)
             return
+
         return f
+
+
+            
 

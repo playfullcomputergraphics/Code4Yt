@@ -1,30 +1,96 @@
-# mandelbrotCython.pyx
-# cython: language_level=3
-#  ---
-#cimport cython
-#from gmpy2 import mpfr, mpc, get_context, sqrt
-##from mpmath import mp, mpc, mpf
-##import gmpy2
-
-# cython: boundscheck=False, wraparound=False, language_level=3
-
+# cython: boundscheck=False, wraparound=False, cdivision=True, initializedcheck=False
+from cython.parallel cimport prange
+cimport cython
 import numpy as np
-cimport numpy as np
-from cython.parallel import prange
 
-cdef inline bint in_cardioid(double x, double y) nogil:
+@cython.cfunc
+@cython.inline
+cdef bint in_cardioidP(double x, double y) nogil:
     cdef double xm = x - 0.25
     cdef double q = xm * xm + y * y
     return q * (q + xm) < 0.25 * y * y
 
-cdef inline bint in_bulb(double x, double y) nogil:
+@cython.cfunc
+@cython.inline
+cdef bint in_bulbP(double x, double y) nogil:
     cdef double xp = x + 1.0
-    return xp * xp + y * y < 0.0625  # 1/16
+    return xp * xp + y * y < 0.0625
+
+
+@cython.cfunc
+cdef void mandel_row(int i,
+                     int width,
+                     double xmin, double dx,
+                     double y,
+                     int max_iter, double horizon2,
+                     int[:, :] image,
+                     double[:, :] zAbs) noexcept nogil:
+    cdef int j, iter
+    cdef double x, zx, zy, zx2, zy2
+
+    for j in range(width):
+        x = xmin + dx * j
+
+        if in_bulbP(x, y) or in_cardioidP(x, y):
+            image[i, j] = max_iter
+            zAbs[i, j] = 0.0
+            continue
+
+        zx = 0.0
+        zy = 0.0
+        zx2 = 0.0
+        zy2 = 0.0
+        iter = 0
+
+        while zx2 + zy2 < horizon2 and iter < max_iter:
+            zy = 2.0 * zx * zy + y
+            zx = zx2 - zy2 + x
+            zx2 = zx * zx
+            zy2 = zy * zy
+            iter += 1
+
+        image[i, j] = iter
+        zAbs[i, j] = zx2 + zy2
+
 
 def compute_mandelbrot(int width, int height,
                        double xmin, double xmax,
                        double ymin, double ymax,
-                       int max_iter, double horizon, int cardioidBulb):
+                       int max_iter, double horizon):
+
+    cdef double[:, :] zAbs = np.zeros((height, width), dtype=np.float64)
+    cdef int[:, :] image = np.zeros((height, width), dtype=np.int32)
+
+    cdef double dx = (xmax - xmin) / width
+    cdef double dy = (ymax - ymin) / height
+    cdef double horizon2 = horizon * horizon
+
+    cdef int i
+    cdef double y
+
+    with nogil:
+        for i in prange(height, schedule='static'):
+            y = ymin + dy * i
+            mandel_row(i, width, xmin, dx, y,
+                       max_iter, horizon2,
+                       image, zAbs)
+
+    return np.asarray(image), np.sqrt(np.asarray(zAbs))
+
+"""
+cdef inline bint in_cardioidS(double x, double y) nogil:
+    cdef double xm = x - 0.25
+    cdef double q = xm * xm + y * y
+    return q * (q + xm) < 0.25 * y * y
+
+cdef inline bint in_bulbS(double x, double y) nogil:
+    cdef double xp = x + 1.0
+    return xp * xp + y * y < 0.0625  # 1/16
+
+def compute_mandelbrotS(int width, int height,
+                       double xmin, double xmax,
+                       double ymin, double ymax,
+                       int max_iter, double horizon):
 
     cdef np.ndarray[np.int32_t, ndim=2] image = np.zeros((height, width), dtype=np.int32)
     cdef np.ndarray[np.float64_t, ndim=2] zAbs = np.zeros((height, width), dtype=np.float64)
@@ -57,13 +123,12 @@ def compute_mandelbrot(int width, int height,
                 zy = 0.0
                 iter = 0
 
-                if cardioidBulb == 1:
-                    if in_cardioid(x, y) or in_bulb(x, y):
-                        #image_view[i, j] = max_iter
-                        #zAbs_view[i, j] = 0.0
-                        r[i*width + j] = max_iter
-                        a[i*width + j] = 0.0
-                        continue
+                if in_cardioidS(x, y) or in_bulbS(x, y):
+                    #image_view[i, j] = max_iter
+                    #zAbs_view[i, j] = 0.0
+                    r[i*width + j] = max_iter
+                    a[i*width + j] = 0.0
+                    continue
                 zx2 = zx*zx
                 zy2 = zy*zy
 
@@ -80,98 +145,10 @@ def compute_mandelbrot(int width, int height,
                 a[i*width + j] = zx*zx + zy*zy
 
     return image, np.sqrt(zAbs)
-
-cdef void compute_row(
-        int i,
-        int width,
-        double xmin, double dx,
-        double y,
-        int max_iter,
-        double horizon2,
-        int cardioidBulb, 
-        int[:, :] image_view,
-        double[:, :] zAbs_view) nogil:
-
-    cdef int j, iter
-    cdef double x, zx, zy, zx2
-
-    for j in range(width):
-        x = xmin + dx * j
-        zx = 0.0
-        zy = 0.0
-        iter = 0
-
-        if cardioidBulb == 1:
-            if in_cardioid(x, y) or in_bulb(x, y):
-                image_view[i, j] = max_iter
-                zAbs_view[i, j] = 0.0
-                continue
-
-        while zx * zx + zy * zy < horizon2 and iter < max_iter:
-            zx2 = zx * zx - zy * zy + x
-            zy = 2.0 * zx * zy + y
-            zx = zx2
-            iter += 1
-
-        image_view[i, j] = iter
-        zAbs_view[i, j] = zx * zx + zy * zy
-
-def compute_mandelbrot_parallel( int width, int height,
-                                 double xmin, double xmax,
-                                 double ymin, double ymax,
-                                 int max_iter, double horizon, int cardioidBulb):
-
-    cdef np.ndarray[np.int32_t, ndim=2] image = np.zeros((height, width), dtype=np.int32)
-    cdef np.ndarray[np.float64_t, ndim=2] zAbs = np.zeros((height, width), dtype=np.float64)
-
-    cdef int[:, :] image_view = image
-    cdef double[:, :] zAbs_view = zAbs
-
-    cdef double dx = (xmax - xmin) / width
-    cdef double dy = (ymax - ymin) / height
-    cdef double horizon2 = horizon * horizon
-
-    cdef int i
-    cdef double y
-    #
-    # prange() (parallel-range) made it necessay to make compute_row() 
-    #
-    for i in prange(height, nogil=True, schedule='static'):
-        y = ymin + dy * i
-        compute_row(i, width, xmin, dx, y,
-                    max_iter, horizon2, cardioidBulb, 
-                    image_view, zAbs_view)
-
-    return image, np.sqrt(zAbs)
-
 """
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def compute_mandelbrot_hp(int width, int height, double xmin, double xmax, double ymin, double ymax, int max_iter, double horizon, int precision, int cardioidBulb):
-    cdef np.ndarray[np.int32_t, ndim=2] image = np.zeros((height, width), dtype=np.int32)
-    cdef np.ndarray[np.float64_t, ndim=2] zAbs = np.zeros((height, width), dtype=np.float64)
-
-    #mp.dps = precision
-    get_context().precision = 20  #200 give ~60 decimal digits
-
-    for x in range(width):
-        real = mpfr(xmin + x * (xmax - xmin) / width)
-        for y in range(height):
-            imag = mpfr(ymin + y * (ymax - ymin) / height)
-            c = mpc(real, imag)
-            z = mpc(0, 0)
-            count = 0
-            while abs(z) <= horizon and count < max_iter:
-                z = z*z + c
-                count += 1
-            image[y, x] = count
-            zAbs[y,x] = abs( z)
-    return image, zAbs
-"""
-
 # cython: boundscheck=False, wraparound=False, cdivision=True
 #import numpy as np
-#cimport numpy as np
+cimport numpy as np
 from libc.math cimport fabs
 
 def compute_julia(np.ndarray[np.float64_t, ndim=2] real_grid,
@@ -246,3 +223,5 @@ def mandelbrot_dz(np.ndarray[np.complex128_t, ndim=2] C, int max_iter):
                             image[y, x] = log(1.0 + nu + log(1.0 + dist))
                         escaped[y, x] = 1
     return image
+
+

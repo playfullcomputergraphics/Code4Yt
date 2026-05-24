@@ -48,18 +48,9 @@ class TileWorker(QThread):
         xmax = self.xmin + (self.xmax - self.xmin) * (x0 + w) / self.width
         ymin = self.ymin + (self.ymax - self.ymin) * y0 / self.width
         ymax = self.ymin + (self.ymax - self.ymin) * (y0 + h) / self.width
-        if TileWorker.highPrec == "True":
-            ( tile, zAbs) = mandelbrotCython.compute_mandelbrot_hp(
-                w, h, xmin, xmax, ymin, ymax, 
-                self.max_iter, self.horizon, 20)
-        elif self.prange == "True":
-            ( tile, zAbs) = mandelbrotCython.compute_mandelbrot_parallel(
-                w, h, xmin, xmax, ymin, ymax, 
-                self.max_iter, self.horizon, int( self.cardioidBulb == "True"))
-        else:
-            ( tile, zAbs) = mandelbrotCython.compute_mandelbrot(
-                w, h, xmin, xmax, ymin, ymax, 
-                self.max_iter, self.horizon, int( self.cardioidBulb == "True"))
+        ( tile, zAbs) = mandelbrotCython.compute_mandelbrot(
+            w, h, xmin, xmax, ymin, ymax, 
+            self.max_iter, self.horizon)
         self.collect(self.col, self.row, tile, zAbs)
 
 class TileWorkerDz(QThread):
@@ -148,3 +139,5 @@ class TileWorkerJulia(QThread):
                                                        self.cxM, self.cyM, 
                                                        self.maxIterJ, self.horizon)
         self.collect(self.col, self.row, tile, zAbs)
+
+
