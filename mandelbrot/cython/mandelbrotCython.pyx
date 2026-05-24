@@ -53,10 +53,8 @@ cdef void mandel_row(int i,
         zAbs[i, j] = zx2 + zy2
 
 
-def compute_mandelbrot(int width, int height,
-                       double xmin, double xmax,
-                       double ymin, double ymax,
-                       int max_iter, double horizon):
+def compute_mandelbrot( int width, int height, double xmin, double xmax,
+                        double ymin, double ymax, int max_iter, double horizon):
 
     cdef double[:, :] zAbs = np.zeros((height, width), dtype=np.float64)
     cdef int[:, :] image = np.zeros((height, width), dtype=np.int32)
