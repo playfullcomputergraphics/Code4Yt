@@ -41,8 +41,12 @@ MPLViewer.py
   matplotlib graphical output
 PGViewer.py
   pyqtgraph graphical output
+Shells.py
+  contains the class ViewerShell, the common interface to 
+  the matplotlib and pyqtgraph viewers.
   
 utils.py
+  code that is used by more that one file
 
 vrsn
   Perl script creating file versions, optional
@@ -77,4 +81,37 @@ python3, python3-pyqt5, python3-numpy, python3-numexpr, python3-matplotlib, cyth
 
 https://github.com/playfullcomputergraphics/Code4Yt
 
+*** installation
+
+--- removed the apt-standard verion of cython
+sudo su root
+apt remove cython3
+
+--- create a virtual environment 'cyenv' to pip-install cython
+    ( I use the virtual environenment because I don't like to
+      pip-install software on the apt-installed system) 
+
+rm -rf cyenv
+python3 -m venv cyenv --system-site-packages
+source cyenv/bin/activate
+pip install --upgrade pip
+pip install cython
+
+--- clone the repo
+
 git clone https://github.com/playfullcomputergraphics/Code4Yt
+
+cd ./Code4Yt/mandelbrot
+chmod +x *.py
+
+--- create the cython libs
+
+cd cython
+chmod +x Do.sh
+source cyenv/bin/activate
+./Do.sh 
+
+--- run the code
+cd ..
+./mandelbrot.py 
+./dynamicOperators.py 
