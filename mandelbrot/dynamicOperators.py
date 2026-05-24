@@ -251,7 +251,7 @@ class operatorWidget( QMainWindow):
         self.enableWidgets()
         
         if self.mode == 'standalone': 
-            utils.readPng( "./places/DynOpN_F425k63221.png",
+            utils.readPng( "./places/DynOpNP_F425k63221.png",
                            MBSObj  = None,
                            DynOpObj = self,
                            ColorWidgetObj = self.colorWidget,
