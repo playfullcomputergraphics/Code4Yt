@@ -91,9 +91,10 @@ apt remove cython3
     ( I use the virtual environenment because I don't like to
       pip-install software on the apt-installed system) 
 
+cd
 rm -rf cyenv
 python3 -m venv cyenv --system-site-packages
-source cyenv/bin/activate
+source ~/cyenv/bin/activate
 pip install --upgrade pip
 pip install cython
 
@@ -108,7 +109,7 @@ chmod +x *.py
 
 cd cython
 chmod +x Do.sh
-source cyenv/bin/activate
+source ~/cyenv/bin/activate
 ./Do.sh 
 
 --- run the code

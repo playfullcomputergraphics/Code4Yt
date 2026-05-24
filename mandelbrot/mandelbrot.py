@@ -889,6 +889,10 @@ class MBSMainWindow( QMainWindow):
 
     def _createIcon(self):
         self.icon = QLabel(self.wCentral)
+        if not os.path.exists( "./MBSIcon.png"):
+            print( "%s.createIcon: ./MBSIcon.png is missing" % self.name)
+            return
+        
         pm = QPixmap("./MBSIcon.png").scaled(70, 70, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.icon.setPixmap(pm)
         self.icon.setFixedSize(pm.size())
